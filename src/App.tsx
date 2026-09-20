@@ -182,14 +182,28 @@ export default function App() {
     priority: number;
     customBaseUrl?: string;
     customAuthHeader?: string;
-  }) => {
-    const res = await safeFetchJson<{ success?: boolean; key?: ApiKeyItem }>('/api/keys', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
-    });
-    if (res.data?.success && res.data.key) {
-      setKeys((prev) => [res.data.key!, ...prev]);
+  }): Promise<{ success: boolean; error?: string; key?: ApiKeyItem }> => {
+    try {
+      const res = await safeFetchJson<{ success?: boolean; key?: ApiKeyItem; error?: string }>('/api/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+
+      if (res.data?.success && res.data.key) {
+        setKeys((prev) => [res.data.key!, ...prev.filter((k) => k.id !== res.data.key!.id)]);
+        return { success: true, key: res.data.key };
+      }
+
+      return {
+        success: false,
+        error: res.data?.error || `Failed to add key (Status ${res.status})`,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err.message || 'Network error while adding key',
+      };
     }
   };
 

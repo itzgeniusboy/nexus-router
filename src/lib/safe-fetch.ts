@@ -8,10 +8,25 @@ export async function safeFetchJson<T = any>(
   init?: RequestInit
 ): Promise<{ ok: boolean; status: number; data: T }> {
   try {
+    let authHeaders: Record<string, string> = {};
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('nexus_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.userId) {
+            authHeaders['x-user-id'] = parsed.userId;
+          }
+        }
+      }
+    } catch {}
+
     const res = await fetch(input, {
+      credentials: 'include',
       ...init,
       headers: {
         Accept: 'application/json',
+        ...authHeaders,
         ...(init?.headers || {}),
       },
     });

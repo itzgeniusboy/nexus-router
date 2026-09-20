@@ -86,7 +86,10 @@ const routerRateLimiter = rateLimit({
 // Middleware to extract user session or authorization
 app.use((req, res, next) => {
   const sessionUserHeader = req.headers['x-user-id'] as string;
-  if (req.user && (req.user as any).userId) {
+  const sessionUserId = (req.session as any)?.userId;
+  if (sessionUserId) {
+    (req as any).userId = sessionUserId;
+  } else if (req.user && (req.user as any).userId) {
     (req as any).userId = (req.user as any).userId;
   } else if (sessionUserHeader) {
     (req as any).userId = sessionUserHeader;
@@ -199,32 +202,48 @@ app.get('/api/keys', (req, res) => {
 });
 
 app.post('/api/keys', (req, res) => {
-  const { provider, label, rawKey, gmailTag, priority, customBaseUrl, customAuthHeader } = req.body;
-  const userId = (req as any).userId || 'default-user';
+  try {
+    const rawKey = (req.body.rawKey || req.body.apiKey || req.body.key || req.body.api_key || req.body.raw_key || '').toString().trim();
+    const provider = (req.body.provider || '').toString().trim().toLowerCase();
+    const label = (req.body.label || '').toString().trim();
+    const { gmailTag, priority, customBaseUrl, customAuthHeader } = req.body;
+    const userId = (req as any).userId || 'default-user';
 
-  if (!provider || !rawKey) {
-    return res.status(400).json({ success: false, error: 'Provider and API Key are required' });
+    if (!provider) {
+      return res.status(400).json({ success: false, error: 'AI Provider is required (e.g. openai, anthropic, google, groq, etc.)' });
+    }
+
+    if (!rawKey) {
+      return res.status(400).json({ success: false, error: 'API Secret Key is required' });
+    }
+
+    if (rawKey.length < 3) {
+      return res.status(400).json({ success: false, error: 'API Key must be at least 3 characters long' });
+    }
+
+    // Auto-resolve or default to the user's primary connected tag if not provided
+    let resolvedGmailTag = gmailTag;
+    if (!resolvedGmailTag) {
+      const accounts = routerStore.getGmailAccounts(userId);
+      resolvedGmailTag = accounts[0]?.email || 'admin@gateway.internal';
+    }
+
+    const created = routerStore.addKey({
+      provider: provider as any,
+      label: label || `${provider.toUpperCase()} Key`,
+      rawKey,
+      gmailTag: resolvedGmailTag,
+      priority: Math.max(1, Number(priority) || 1),
+      customBaseUrl: customBaseUrl ? String(customBaseUrl).trim() : undefined,
+      customAuthHeader: customAuthHeader ? String(customAuthHeader).trim() : undefined,
+      userId,
+    });
+
+    res.status(201).json({ success: true, key: created });
+  } catch (err: any) {
+    console.error('[API] Error creating API key:', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to encrypt and store API key' });
   }
-
-  // Auto-resolve or default to the user's primary connected gmail if not provided
-  let resolvedGmailTag = gmailTag;
-  if (!resolvedGmailTag) {
-    const accounts = routerStore.getGmailAccounts(userId);
-    resolvedGmailTag = accounts[0]?.email || 'unassigned@gmail.com';
-  }
-
-  const created = routerStore.addKey({
-    provider,
-    label: label || `${provider} Key`,
-    rawKey,
-    gmailTag: resolvedGmailTag,
-    priority: Number(priority) || 1,
-    customBaseUrl,
-    customAuthHeader,
-    userId,
-  });
-
-  res.status(201).json({ success: true, key: created });
 });
 
 app.patch('/api/keys/:id', (req, res) => {

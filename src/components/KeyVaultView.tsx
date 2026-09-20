@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  AlertCircle,
   AlertTriangle,
   Check,
   CheckCircle2,
@@ -36,7 +37,7 @@ interface Props {
     priority: number;
     customBaseUrl?: string;
     customAuthHeader?: string;
-  }) => Promise<void>;
+  }) => Promise<{ success: boolean; error?: string; key?: ApiKeyItem } | void>;
   onToggleKey: (id: string, enabled: boolean) => Promise<void>;
   onDeleteKey: (id: string) => Promise<void>;
   onTestKey: (id: string) => Promise<{ latencyMs: number }>;
@@ -65,12 +66,15 @@ export const KeyVaultView: React.FC<Props> = ({
 
   // Add Key Form State
   const [newProvider, setNewProvider] = useState<ProviderId>('openai');
+  const [providerManuallySelected, setProviderManuallySelected] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newRawKey, setNewRawKey] = useState('');
+  const [showKeyPassword, setShowKeyPassword] = useState(false);
   const [newPriority, setNewPriority] = useState(1);
   const [newCustomBaseUrl, setNewCustomBaseUrl] = useState('');
   const [newCustomAuthHeader, setNewCustomAuthHeader] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   // Edit Key Modal State
   const [editingKey, setEditingKey] = useState<ApiKeyItem | null>(null);
@@ -78,7 +82,8 @@ export const KeyVaultView: React.FC<Props> = ({
   // Auto-detect provider as user types the API key
   const handleKeyInputChange = (val: string) => {
     setNewRawKey(val);
-    if (val.length > 4) {
+    if (modalError) setModalError(null);
+    if (!providerManuallySelected && val.trim().length > 4) {
       const detected = detectProviderFromKey(val);
       if (detected !== 'custom' && detected !== newProvider) {
         setNewProvider(detected);
@@ -88,24 +93,44 @@ export const KeyVaultView: React.FC<Props> = ({
 
   const handleCreateKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRawKey.trim()) return;
+    const cleanKey = newRawKey.trim();
+    if (!cleanKey) {
+      setModalError('Please enter an API secret key.');
+      return;
+    }
+    if (cleanKey.length < 3) {
+      setModalError('API key must be at least 3 characters long.');
+      return;
+    }
 
+    setModalError(null);
     setIsSubmitting(true);
     try {
-      await onAddKey({
+      const result = await onAddKey({
         provider: newProvider,
         label: newLabel.trim() || `${newProvider.toUpperCase()} Key`,
-        rawKey: newRawKey.trim(),
+        rawKey: cleanKey,
         priority: newPriority,
-        customBaseUrl: newProvider === 'custom' ? newCustomBaseUrl : undefined,
-        customAuthHeader: newProvider === 'custom' ? newCustomAuthHeader : undefined,
+        customBaseUrl: newProvider === 'custom' && newCustomBaseUrl.trim() ? newCustomBaseUrl.trim() : undefined,
+        customAuthHeader: newProvider === 'custom' && newCustomAuthHeader.trim() ? newCustomAuthHeader.trim() : undefined,
       });
-      // Reset form
+
+      if (result && typeof result === 'object' && result.success === false) {
+        setModalError(result.error || 'Server could not save this key. Please check the key format.');
+        return;
+      }
+
+      // Reset form on success
       setNewRawKey('');
       setNewLabel('');
       setNewCustomBaseUrl('');
       setNewCustomAuthHeader('');
+      setModalError(null);
+      setShowKeyPassword(false);
+      setProviderManuallySelected(false);
       setIsAddModalOpen(false);
+    } catch (err: any) {
+      setModalError(err.message || 'Failed to add key to vault');
     } finally {
       setIsSubmitting(false);
     }
@@ -459,18 +484,38 @@ export const KeyVaultView: React.FC<Props> = ({
 
             <form onSubmit={handleCreateKey} className="flex flex-col overflow-hidden">
               <div className="overflow-y-auto p-5 space-y-4 max-h-[calc(90vh-140px)]">
+                {/* Error Banner if any */}
+                {modalError && (
+                  <div className="rounded-xl border border-rose-500/40 bg-rose-500/15 p-3.5 text-xs text-rose-200 flex items-start space-x-2.5 animate-in fade-in duration-150">
+                    <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <span className="font-semibold text-rose-300">Error adding key: </span>
+                      <span className="text-white/90">{modalError}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Provider Selector Grid */}
                 <div>
-                  <label className="block text-xs font-medium text-[#C5CEE0]">Select AI Provider</label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-medium text-[#C5CEE0]">Select AI Provider</label>
+                    <span className="text-[10px] text-[#5B6CFF] font-medium uppercase tracking-wider">
+                      Active: {newProvider}
+                    </span>
+                  </div>
                   <div className="mt-1.5 grid max-h-36 grid-cols-3 gap-2 overflow-y-auto pr-1">
                     {PROVIDERS.map((p) => (
                       <button
                         key={p.id}
                         type="button"
-                        onClick={() => setNewProvider(p.id)}
+                        onClick={() => {
+                          setNewProvider(p.id);
+                          setProviderManuallySelected(true);
+                          if (modalError) setModalError(null);
+                        }}
                         className={`flex items-center space-x-2 rounded-xl border p-2 text-left text-xs transition ${
                           newProvider === p.id
-                            ? 'border-[#5B6CFF] bg-[#5B6CFF]/15 text-white shadow-sm'
+                            ? 'border-[#5B6CFF] bg-[#5B6CFF]/20 text-white shadow-sm ring-1 ring-[#5B6CFF]'
                             : 'border-white/[0.06] bg-[#0B0D10]/70 text-[#8A94A6] hover:text-white'
                         }`}
                       >
@@ -481,20 +526,48 @@ export const KeyVaultView: React.FC<Props> = ({
                   </div>
                 </div>
 
-                {/* Raw Key Input */}
+                {/* Raw Key Input with Eye toggle & Paste */}
                 <div>
-                  <label className="block text-xs font-medium text-[#C5CEE0]">API Secret Key</label>
-                  <input
-                    id="modal-raw-key-input"
-                    type="password"
-                    placeholder="e.g. sk-..., gsk_..., AIzaSy..."
-                    value={newRawKey}
-                    onChange={(e) => handleKeyInputChange(e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-xl border border-white/[0.15] bg-[#0E121B] px-3 py-2 text-xs font-mono text-white placeholder-[#6C768A] focus:border-[#5B6CFF] focus:bg-[#121622] focus:outline-none"
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-medium text-[#C5CEE0]">API Secret Key</label>
+                    {typeof navigator !== 'undefined' && navigator.clipboard && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const text = await navigator.clipboard.readText();
+                            if (text) handleKeyInputChange(text.trim());
+                          } catch {}
+                        }}
+                        className="text-[11px] text-[#5B6CFF] hover:text-[#8C9BFF] transition flex items-center space-x-1"
+                      >
+                        <Copy className="h-3 w-3" />
+                        <span>Paste from clipboard</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative mt-1">
+                    <input
+                      id="modal-raw-key-input"
+                      type={showKeyPassword ? 'text' : 'password'}
+                      placeholder="e.g. sk-..., gsk_..., AIzaSy..."
+                      value={newRawKey}
+                      onChange={(e) => handleKeyInputChange(e.target.value)}
+                      required
+                      autoFocus
+                      className="w-full rounded-xl border border-white/[0.15] bg-[#0E121B] px-3 py-2 pr-10 text-xs font-mono text-white placeholder-[#6C768A] focus:border-[#5B6CFF] focus:bg-[#121622] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKeyPassword(!showKeyPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#717B8F] hover:text-white transition p-1"
+                      title={showKeyPassword ? 'Hide key' : 'Show key'}
+                    >
+                      {showKeyPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   <span className="mt-1 block text-[11px] text-[#717B8F]">
-                    Encrypted at rest with AES-256-GCM. Never logged or exposed to client apps.
+                    Encrypted at rest with AES-256-GCM. Never logged or exposed in client responses.
                   </span>
                 </div>
 
