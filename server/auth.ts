@@ -1,27 +1,38 @@
 import crypto from 'crypto';
 import type { Express } from 'express';
 import passport from 'passport';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { getDatabase } from './db';
-import { routerStore } from './store';
+import { pgUpsertUser } from './postgres';
 
 export interface UserSession {
   userId: string;
-  email: string;
+  username: string;
   name: string;
   avatar?: string;
+  email?: string;
 }
 
-export function getUserByEmail(email: string): UserSession | null {
-  const db = getDatabase();
-  const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
-  if (!row) return null;
-  return {
-    userId: row.id,
-    email: row.email,
-    name: row.name,
-    avatar: row.avatar || undefined,
-  };
+/**
+ * Derives a cryptographically secure hash for a password with salt using PBKDF2 (SHA-512, 100,000 iterations).
+ */
+export function hashPassword(password: string, salt: string): string {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+}
+
+/**
+ * Verifies a plain text password against a stored hash and salt using constant-time comparison.
+ */
+export function verifyPassword(password: string, storedHash: string, salt: string): boolean {
+  if (!password || !storedHash || !salt) return false;
+  try {
+    const computedHash = hashPassword(password, salt);
+    const computedBuf = Buffer.from(computedHash, 'hex');
+    const storedBuf = Buffer.from(storedHash, 'hex');
+    if (computedBuf.length !== storedBuf.length) return false;
+    return crypto.timingSafeEqual(computedBuf, storedBuf);
+  } catch {
+    return false;
+  }
 }
 
 export function getUserById(id: string): UserSession | null {
@@ -30,54 +41,114 @@ export function getUserById(id: string): UserSession | null {
   if (!row) return null;
   return {
     userId: row.id,
-    email: row.email,
-    name: row.name,
+    username: row.username || row.email?.split('@')[0] || row.name || 'user',
+    name: row.name || row.username || 'User',
     avatar: row.avatar || undefined,
+    email: row.email || undefined,
   };
 }
 
-export function createOrUpdateGoogleUser(profile: {
-  email: string;
-  name: string;
-  avatar?: string;
-}): UserSession {
+export function getUserByUsername(username: string): (UserSession & { passwordHash: string; passwordSalt: string }) | null {
   const db = getDatabase();
-  const existing = getUserByEmail(profile.email);
+  const cleanUsername = username.trim().toLowerCase();
+  const row = db.prepare('SELECT * FROM users WHERE LOWER(username) = ? OR LOWER(email) = ?').get(cleanUsername, cleanUsername) as any;
+  if (!row) return null;
+  return {
+    userId: row.id,
+    username: row.username || row.email?.split('@')[0] || cleanUsername,
+    name: row.name || row.username || 'User',
+    avatar: row.avatar || undefined,
+    email: row.email || undefined,
+    passwordHash: row.password_hash || '',
+    passwordSalt: row.password_salt || '',
+  };
+}
 
-  if (existing) {
-    db.prepare('UPDATE users SET name = ?, avatar = ? WHERE id = ?').run(
-      profile.name,
-      profile.avatar || null,
-      existing.userId
-    );
-    // Ensure this email exists in gmail_accounts for this user
-    routerStore.addGmailAccount(profile.email, profile.name, existing.userId);
-    return {
-      userId: existing.userId,
-      email: profile.email,
-      name: profile.name,
-      avatar: profile.avatar,
-    };
+/**
+ * Registers a new user with a unique username, password, and optional display name.
+ */
+export function registerUser(username: string, password: string, name?: string): UserSession {
+  const cleanUsername = (username || '').trim();
+
+  // Validate username
+  if (!cleanUsername) {
+    throw new Error('Username is required.');
+  }
+  if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+    throw new Error('Username must be between 3 and 30 characters.');
+  }
+  if (!/^[a-zA-Z0-9_\-\.]+$/.test(cleanUsername)) {
+    throw new Error('Username can only contain alphanumeric characters, underscores, hyphens, and periods.');
   }
 
-  const userId = `usr_${crypto.randomBytes(8).toString('hex')}`;
-  db.prepare(`
-    INSERT INTO users (id, email, name, avatar, created_at)
-    VALUES (?, ?, ?, ?, datetime('now'))
-  `).run(userId, profile.email, profile.name, profile.avatar || null);
+  // Validate password
+  if (!password || password.length < 6) {
+    throw new Error('Password must be at least 6 characters long.');
+  }
 
-  // Auto-create primary gmail_accounts row for this authenticated Google user
-  const accountId = `gm-${Date.now().toString(36)}`;
+  const db = getDatabase();
+
+  // Check uniqueness (case-insensitive)
+  const existing = db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?)').get(cleanUsername) as any;
+  if (existing) {
+    throw new Error(`Username "${cleanUsername}" is already taken. Please choose another username.`);
+  }
+
+  const salt = crypto.randomBytes(16).toString('hex');
+  const passwordHash = hashPassword(password, salt);
+  const userId = `usr_${crypto.randomBytes(8).toString('hex')}`;
+  const displayName = (name || '').trim() || cleanUsername;
+
+  // Insert into SQLite
   db.prepare(`
-    INSERT OR IGNORE INTO gmail_accounts (id, user_id, email, name, is_primary, avatar_color, added_at)
-    VALUES (?, ?, ?, ?, 1, '#5B6CFF', datetime('now'))
-  `).run(accountId, userId, profile.email, profile.name);
+    INSERT INTO users (id, username, password_hash, password_salt, name, created_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
+  `).run(userId, cleanUsername, passwordHash, salt, displayName);
+
+  // Sync to PostgreSQL if configured
+  pgUpsertUser({
+    id: userId,
+    username: cleanUsername,
+    passwordHash,
+    passwordSalt: salt,
+    name: displayName,
+  }).catch(() => {});
 
   return {
     userId,
-    email: profile.email,
-    name: profile.name,
-    avatar: profile.avatar,
+    username: cleanUsername,
+    name: displayName,
+  };
+}
+
+/**
+ * Authenticates an existing user by username and password.
+ */
+export function loginUser(username: string, password: string): UserSession {
+  const cleanUsername = (username || '').trim();
+  if (!cleanUsername) {
+    throw new Error('Username is required.');
+  }
+  if (!password) {
+    throw new Error('Password is required.');
+  }
+
+  const user = getUserByUsername(cleanUsername);
+  if (!user || !user.passwordHash || !user.passwordSalt) {
+    throw new Error('Invalid username or password.');
+  }
+
+  const isValid = verifyPassword(password, user.passwordHash, user.passwordSalt);
+  if (!isValid) {
+    throw new Error('Invalid username or password.');
+  }
+
+  return {
+    userId: user.userId,
+    username: user.username,
+    name: user.name,
+    avatar: user.avatar,
+    email: user.email,
   };
 }
 
@@ -94,39 +165,4 @@ export function configurePassport(app: Express) {
       done(err, null);
     }
   });
-
-  const clientID = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const appUrl =
-    process.env.APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://nexusrouter.vercel.app');
-  const callbackURL = process.env.GOOGLE_CALLBACK_URL || `${appUrl}/auth/google/callback`;
-
-  if (clientID && clientSecret) {
-    passport.use(
-      new GoogleStrategy(
-        {
-          clientID,
-          clientSecret,
-          callbackURL,
-          proxy: true,
-        },
-        async (accessToken, refreshToken, profile, done) => {
-          try {
-            const email = profile.emails?.[0]?.value;
-            if (!email) {
-              return done(new Error('No email found in Google profile'), undefined);
-            }
-            const name = profile.displayName || email.split('@')[0];
-            const avatar = profile.photos?.[0]?.value;
-
-            const user = createOrUpdateGoogleUser({ email, name, avatar });
-            return done(null, user);
-          } catch (err) {
-            return done(err as Error, undefined);
-          }
-        }
-      )
-    );
-  }
 }

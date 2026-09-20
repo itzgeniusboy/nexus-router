@@ -367,7 +367,7 @@ class PersistentRouterStore {
     provider: ProviderId;
     label: string;
     rawKey: string;
-    gmailTag: string;
+    gmailTag?: string;
     priority?: number;
     customBaseUrl?: string;
     customAuthHeader?: string;
@@ -379,6 +379,7 @@ class PersistentRouterStore {
     const encryptedKey = encryptKey(data.rawKey);
     const userId = data.userId || 'default-user';
     const createdAt = new Date().toISOString();
+    const tag = data.gmailTag || '';
 
     db.prepare(`
       INSERT INTO api_keys (
@@ -393,7 +394,7 @@ class PersistentRouterStore {
       data.label || `${data.provider} Key`,
       maskedKey,
       encryptedKey,
-      data.gmailTag,
+      tag,
       data.priority || 1,
       createdAt,
       data.customBaseUrl || null,
@@ -665,20 +666,45 @@ class PersistentRouterStore {
 
   public addGmailAccount(email: string, name = '', userId = 'default-user'): GmailAccount {
     const db = getDatabase();
+    const cleanEmail = email.trim().toLowerCase();
+    const existing = db.prepare('SELECT * FROM gmail_accounts WHERE LOWER(email) = LOWER(?)').get(cleanEmail) as any;
+
+    if (existing) {
+      const updatedName = name.trim() || existing.name || cleanEmail.split('@')[0];
+      db.prepare('UPDATE gmail_accounts SET name = ?, user_id = COALESCE(?, user_id) WHERE id = ?').run(
+        updatedName,
+        userId,
+        existing.id
+      );
+
+      const account: GmailAccount = {
+        id: existing.id,
+        email: existing.email,
+        name: updatedName,
+        isPrimary: Boolean(existing.is_primary),
+        avatarColor: existing.avatar_color || '#5B6CFF',
+        addedAt: existing.added_at,
+        keyCount: 0,
+      };
+      pgUpsertGmailAccount(account, userId).catch(() => {});
+      return account;
+    }
+
     const id = `gm-${Date.now().toString(36)}`;
     const colors = ['#5B6CFF', '#10A37F', '#F59E0B', '#EC4899', '#8B5CF6', '#3B82F6'];
     const avatarColor = colors[Math.floor(Math.random() * colors.length)];
     const addedAt = new Date().toISOString();
+    const accountName = name.trim() || cleanEmail.split('@')[0];
 
     db.prepare(`
       INSERT OR IGNORE INTO gmail_accounts (id, user_id, email, name, is_primary, avatar_color, added_at)
       VALUES (?, ?, ?, ?, 0, ?, ?)
-    `).run(id, userId, email, name || email.split('@')[0], avatarColor, addedAt);
+    `).run(id, userId, cleanEmail, accountName, avatarColor, addedAt);
 
     const account: GmailAccount = {
       id,
-      email,
-      name: name || email.split('@')[0],
+      email: cleanEmail,
+      name: accountName,
       isPrimary: false,
       avatarColor,
       addedAt,

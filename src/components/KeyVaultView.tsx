@@ -25,14 +25,14 @@ import { ProviderIcon } from './ProviderIcon';
 
 interface Props {
   keys: ApiKeyItem[];
-  gmailAccounts: GmailAccount[];
-  selectedGmail: string;
-  setSelectedGmail: (email: string) => void;
+  gmailAccounts?: GmailAccount[];
+  selectedGmail?: string;
+  setSelectedGmail?: (email: string) => void;
   onAddKey: (params: {
     provider: ProviderId;
     label: string;
     rawKey: string;
-    gmailTag: string;
+    gmailTag?: string;
     priority: number;
     customBaseUrl?: string;
     customAuthHeader?: string;
@@ -48,9 +48,6 @@ interface Props {
 
 export const KeyVaultView: React.FC<Props> = ({
   keys,
-  gmailAccounts,
-  selectedGmail,
-  setSelectedGmail,
   onAddKey,
   onToggleKey,
   onDeleteKey,
@@ -70,18 +67,10 @@ export const KeyVaultView: React.FC<Props> = ({
   const [newProvider, setNewProvider] = useState<ProviderId>('openai');
   const [newLabel, setNewLabel] = useState('');
   const [newRawKey, setNewRawKey] = useState('');
-  const defaultAccountEmail = gmailAccounts[0]?.email || '';
-  const [newGmailTag, setNewGmailTag] = useState(
-    selectedGmail !== 'all' ? selectedGmail : defaultAccountEmail
-  );
   const [newPriority, setNewPriority] = useState(1);
   const [newCustomBaseUrl, setNewCustomBaseUrl] = useState('');
   const [newCustomAuthHeader, setNewCustomAuthHeader] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Quick Inline Add Gmail
-  const [showQuickAddGmail, setShowQuickAddGmail] = useState(false);
-  const [quickGmailInput, setQuickGmailInput] = useState('');
 
   // Edit Key Modal State
   const [editingKey, setEditingKey] = useState<ApiKeyItem | null>(null);
@@ -103,12 +92,10 @@ export const KeyVaultView: React.FC<Props> = ({
 
     setIsSubmitting(true);
     try {
-      const tagToUse = quickGmailInput.trim() || newGmailTag || defaultAccountEmail || 'unassigned@gmail.com';
       await onAddKey({
         provider: newProvider,
         label: newLabel.trim() || `${newProvider.toUpperCase()} Key`,
         rawKey: newRawKey.trim(),
-        gmailTag: tagToUse,
         priority: newPriority,
         customBaseUrl: newProvider === 'custom' ? newCustomBaseUrl : undefined,
         customAuthHeader: newProvider === 'custom' ? newCustomAuthHeader : undefined,
@@ -116,8 +103,8 @@ export const KeyVaultView: React.FC<Props> = ({
       // Reset form
       setNewRawKey('');
       setNewLabel('');
-      setQuickGmailInput('');
-      setShowQuickAddGmail(false);
+      setNewCustomBaseUrl('');
+      setNewCustomAuthHeader('');
       setIsAddModalOpen(false);
     } finally {
       setIsSubmitting(false);
@@ -140,23 +127,21 @@ export const KeyVaultView: React.FC<Props> = ({
 
   // Filter keys
   const filteredKeys = keys.filter((key) => {
-    const matchesGmail = selectedGmail === 'all' || key.gmailTag === selectedGmail;
     const matchesProvider = providerFilter === 'all' || key.provider === providerFilter;
     const matchesSearch =
       searchQuery.trim() === '' ||
       key.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      key.maskedKey.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      key.gmailTag.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesGmail && matchesProvider && matchesSearch;
+      key.maskedKey.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesProvider && matchesSearch;
   });
 
   return (
     <div className="space-y-6">
       {/* Top Filter & Search Bar with Glassmorphism */}
-      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur-md md:flex-row md:items-center md:justify-between shadow-lg">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur-md md:flex-row md:items-center md:justify-between shadow-lg">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3 flex-1">
           {/* Search Box */}
-          <div className="relative min-w-[240px]">
+          <div className="relative w-full sm:w-auto sm:min-w-[220px] flex-1">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#6C768A]" />
             <input
               id="search-keys-input"
@@ -168,51 +153,35 @@ export const KeyVaultView: React.FC<Props> = ({
             />
           </div>
 
-          {/* Provider Filter Dropdown */}
-          <div className="flex items-center space-x-2">
-            <Filter className="h-3.5 w-3.5 text-[#6C768A]" />
-            <select
-              id="provider-filter-select"
-              value={providerFilter}
-              onChange={(e) => setProviderFilter(e.target.value)}
-              className="rounded-xl border border-white/[0.14] bg-[#141724] px-3 py-2 text-xs text-white focus:border-[#5B6CFF] focus:outline-none cursor-pointer [&>option]:bg-[#161924] [&>option]:text-white"
-            >
-              <option value="all">All Providers ({keys.length})</option>
-              {PROVIDERS.map((p) => {
-                const count = keys.filter((k) => k.provider === p.id).length;
-                return (
-                  <option key={p.id} value={p.id}>
-                    {p.name} {count > 0 ? `(${count})` : ''}
-                  </option>
-                );
-              })}
-            </select>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Provider Filter Dropdown */}
+            <div className="flex items-center space-x-1.5 flex-1 sm:flex-none">
+              <Filter className="h-3.5 w-3.5 text-[#6C768A] shrink-0" />
+              <select
+                id="provider-filter-select"
+                value={providerFilter}
+                onChange={(e) => setProviderFilter(e.target.value)}
+                className="w-full sm:w-auto rounded-xl border border-white/[0.14] bg-[#141724] px-2.5 sm:px-3 py-2 text-xs text-white focus:border-[#5B6CFF] focus:outline-none cursor-pointer [&>option]:bg-[#161924] [&>option]:text-white truncate"
+              >
+                <option value="all">All Providers ({keys.length})</option>
+                {PROVIDERS.map((p) => {
+                  const count = keys.filter((k) => k.provider === p.id).length;
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {count > 0 ? `(${count})` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
           </div>
-
-          {/* Gmail Tag Filter Dropdown */}
-          <select
-            id="gmail-filter-select"
-            value={selectedGmail}
-            onChange={(e) => setSelectedGmail(e.target.value)}
-            className="rounded-xl border border-white/[0.14] bg-[#141724] px-3 py-2 text-xs text-white focus:border-[#5B6CFF] focus:outline-none cursor-pointer [&>option]:bg-[#161924] [&>option]:text-white"
-          >
-            <option value="all">All Gmail Tags</option>
-            {gmailAccounts.map((acc) => {
-              const count = keys.filter((k) => k.gmailTag === acc.email).length;
-              return (
-                <option key={acc.id} value={acc.email}>
-                  {acc.email} {count > 0 ? `(${count} keys)` : ''}
-                </option>
-              );
-            })}
-          </select>
         </div>
 
         {/* Add Key Button */}
         <button
           id="vault-add-key-btn"
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center justify-center space-x-2 rounded-xl bg-[#5B6CFF] px-4 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-[#4E5EEB] active:scale-[0.98]"
+          className="flex w-full sm:w-auto items-center justify-center space-x-2 rounded-xl bg-[#5B6CFF] px-4 py-2.5 sm:py-2 text-xs font-medium text-white shadow-sm transition hover:bg-[#4E5EEB] active:scale-[0.98] shrink-0"
         >
           <Plus className="h-4 w-4" />
           <span>Add New API Key</span>
@@ -239,17 +208,16 @@ export const KeyVaultView: React.FC<Props> = ({
           </div>
           <h3 className="mt-4 text-sm font-semibold text-white">No API Keys Found in Vault</h3>
           <p className="mt-1 max-w-sm text-xs text-[#8A94A6]">
-            {searchQuery || providerFilter !== 'all' || selectedGmail !== 'all'
+            {searchQuery || providerFilter !== 'all'
               ? 'No keys match your current filter criteria. Try clearing filters or searching for another term.'
               : 'Securely store provider API keys with AES-256-GCM encryption to enable continuous flow auto-rotation.'}
           </p>
           <div className="mt-4 flex items-center space-x-3">
-            {(searchQuery || providerFilter !== 'all' || selectedGmail !== 'all') && (
+            {(searchQuery || providerFilter !== 'all') && (
               <button
                 onClick={() => {
                   setSearchQuery('');
                   setProviderFilter('all');
-                  setSelectedGmail('all');
                 }}
                 className="text-xs text-[#5B6CFF] hover:underline"
               >
@@ -299,10 +267,11 @@ export const KeyVaultView: React.FC<Props> = ({
                           {providerMeta.name}
                         </span>
                       </div>
-                      {/* Gmail Tag */}
+                      {/* Key ID & Provider info */}
                       <div className="mt-1 flex items-center space-x-1.5 text-xs text-[#717B8F]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#5B6CFF]" />
-                        <span>Tagged: {key.gmailTag}</span>
+                        <span className="font-mono text-[10px] text-[#5B6CFF]">{key.id}</span>
+                        <span className="text-white/[0.2]">•</span>
+                        <span className="text-[11px] text-[#8A94A6]">Priority Tier P{key.priority}</span>
                       </div>
                     </div>
                   </div>
@@ -392,8 +361,8 @@ export const KeyVaultView: React.FC<Props> = ({
                 </div>
 
                 {/* Metrics Footer */}
-                <div className="mt-4 flex items-center justify-between border-t border-white/[0.04] pt-3 text-xs text-[#8A94A6]">
-                  <div className="flex items-center space-x-4">
+                <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-white/[0.04] pt-3 text-xs text-[#8A94A6]">
+                  <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1">
                     <div>
                       <span className="text-[#6C768A]">Requests: </span>
                       <span className="font-medium text-white">{key.totalRequests}</span>
@@ -411,7 +380,7 @@ export const KeyVaultView: React.FC<Props> = ({
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1.5 self-end sm:self-auto shrink-0">
                     {successMsg && (
                       <span className="mr-2 text-[10px] font-medium text-emerald-400 animate-fade-in">
                         {successMsg}
@@ -541,46 +510,6 @@ export const KeyVaultView: React.FC<Props> = ({
                   />
                 </div>
 
-                {/* Gmail Identity Tag Selection */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-[#C5CEE0]">
-                      Assign to Connected Gmail Account
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowQuickAddGmail(!showQuickAddGmail)}
-                      className="text-[11px] text-[#5B6CFF] hover:underline"
-                    >
-                      {showQuickAddGmail ? 'Select Existing' : '+ Connect New Gmail Tag'}
-                    </button>
-                  </div>
-
-                  {showQuickAddGmail ? (
-                    <div className="mt-1.5">
-                      <input
-                        type="email"
-                        placeholder="your.account@gmail.com"
-                        value={quickGmailInput}
-                        onChange={(e) => setQuickGmailInput(e.target.value)}
-                        className="w-full rounded-xl border border-[#5B6CFF]/50 bg-[#0E121B] px-3 py-2 text-xs text-white placeholder-[#6C768A] focus:outline-none focus:border-[#5B6CFF]"
-                      />
-                    </div>
-                  ) : (
-                    <select
-                      value={newGmailTag}
-                      onChange={(e) => setNewGmailTag(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-white/[0.14] bg-[#0E121B] px-3 py-2 text-xs text-white focus:border-[#5B6CFF] focus:outline-none [&>option]:bg-[#161924] [&>option]:text-white cursor-pointer"
-                    >
-                      {gmailAccounts.map((acc) => (
-                        <option key={acc.id} value={acc.email}>
-                          {acc.email} ({acc.name || 'Account'})
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
                 {/* Priority Selection with Tooltips */}
                 <div>
                   <div className="flex items-center space-x-1.5">
@@ -654,11 +583,11 @@ export const KeyVaultView: React.FC<Props> = ({
               </div>
 
               {/* Submit Buttons */}
-              <div className="flex items-center justify-end space-x-3 border-t border-white/[0.08] bg-[#191D2B] p-4 shrink-0 rounded-b-2xl">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:space-x-3 border-t border-white/[0.08] bg-[#191D2B] p-4 shrink-0 rounded-b-2xl">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="rounded-xl border border-white/[0.1] bg-[#141822] px-4 py-2 text-xs font-medium text-[#8A94A6] hover:text-white"
+                  className="w-full sm:w-auto rounded-xl border border-white/[0.1] bg-[#141822] px-4 py-2.5 sm:py-2 text-xs font-medium text-[#8A94A6] hover:text-white transition text-center"
                 >
                   Cancel
                 </button>
@@ -666,7 +595,7 @@ export const KeyVaultView: React.FC<Props> = ({
                   id="submit-add-key-btn"
                   type="submit"
                   disabled={isSubmitting || !newRawKey.trim()}
-                  className="rounded-xl bg-[#5B6CFF] px-4 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-[#4E5EEB] disabled:opacity-50"
+                  className="w-full sm:w-auto rounded-xl bg-[#5B6CFF] px-4 py-2.5 sm:py-2 text-xs font-medium text-white shadow-sm transition hover:bg-[#4E5EEB] disabled:opacity-50 text-center"
                 >
                   {isSubmitting ? 'Encrypting with AES-256-GCM...' : 'Vault & Encrypt Key'}
                 </button>
@@ -708,26 +637,11 @@ export const KeyVaultView: React.FC<Props> = ({
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-[#C5CEE0]">Gmail Tag</label>
-                <select
-                  value={editingKey.gmailTag}
-                  onChange={(e) => setEditingKey({ ...editingKey, gmailTag: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-white/[0.14] bg-[#0E121B] px-3 py-2 text-xs text-white focus:border-[#5B6CFF] focus:outline-none [&>option]:bg-[#161924] [&>option]:text-white"
-                >
-                  {gmailAccounts.map((acc) => (
-                    <option key={acc.id} value={acc.email}>
-                      {acc.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mt-6 flex justify-end space-x-3 border-t border-white/[0.08] pt-4">
+              <div className="mt-6 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:space-x-3 border-t border-white/[0.08] pt-4">
                 <button
                   type="button"
                   onClick={() => setEditingKey(null)}
-                  className="rounded-xl border border-white/[0.1] bg-[#141822] px-4 py-2 text-xs font-medium text-[#8A94A6] hover:text-white transition"
+                  className="w-full sm:w-auto rounded-xl border border-white/[0.1] bg-[#141822] px-4 py-2.5 sm:py-2 text-xs font-medium text-[#8A94A6] hover:text-white transition text-center"
                 >
                   Cancel
                 </button>
@@ -736,11 +650,10 @@ export const KeyVaultView: React.FC<Props> = ({
                     await onUpdateKey(editingKey.id, {
                       label: editingKey.label,
                       priority: editingKey.priority,
-                      gmailTag: editingKey.gmailTag,
                     });
                     setEditingKey(null);
                   }}
-                  className="rounded-xl bg-[#5B6CFF] px-4 py-2 text-xs font-medium text-white hover:bg-[#4E5EEB] transition"
+                  className="w-full sm:w-auto rounded-xl bg-[#5B6CFF] px-4 py-2.5 sm:py-2 text-xs font-medium text-white hover:bg-[#4E5EEB] transition text-center"
                 >
                   Save Changes
                 </button>

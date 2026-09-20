@@ -24,13 +24,14 @@ import {
   User,
   Zap,
 } from 'lucide-react';
-import { DatabaseStatus, GmailAccount, RouterSettings } from '../types';
+import { DatabaseStatus, RouterSettings, UserProfile } from '../types';
 
 interface Props {
   settings: RouterSettings;
-  gmailAccounts: GmailAccount[];
+  user?: UserProfile | null;
   onUpdateSettings: (newSettings: Partial<RouterSettings>) => Promise<void>;
-  onAddGmailAccount: (email: string, name: string) => Promise<void>;
+  onOpenAuthModal?: () => void;
+  onLogout?: () => Promise<void>;
   databaseStatus?: DatabaseStatus | null;
   onTestDatabase?: () => Promise<void>;
   onSyncDatabase?: () => Promise<void>;
@@ -40,9 +41,10 @@ interface Props {
 
 export const SettingsView: React.FC<Props> = ({
   settings,
-  gmailAccounts,
+  user,
   onUpdateSettings,
-  onAddGmailAccount,
+  onOpenAuthModal,
+  onLogout,
   databaseStatus,
   onTestDatabase,
   onSyncDatabase,
@@ -51,9 +53,6 @@ export const SettingsView: React.FC<Props> = ({
 }) => {
   const [currentSettings, setCurrentSettings] = useState<RouterSettings>(settings);
   const [isSaved, setIsSaved] = useState(false);
-  const [newGmailEmail, setNewGmailEmail] = useState('');
-  const [newGmailName, setNewGmailName] = useState('');
-  const [isAddingGmail, setIsAddingGmail] = useState(false);
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
@@ -66,16 +65,6 @@ export const SettingsView: React.FC<Props> = ({
     await onUpdateSettings(currentSettings);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2500);
-  };
-
-  const handleCreateGmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newGmailEmail.trim()) return;
-
-    await onAddGmailAccount(newGmailEmail.trim(), newGmailName.trim());
-    setNewGmailEmail('');
-    setNewGmailName('');
-    setIsAddingGmail(false);
   };
 
   return (
@@ -211,7 +200,7 @@ export const SettingsView: React.FC<Props> = ({
                 <button
                   id="save-settings-btn"
                   onClick={handleSaveSettings}
-                  className="flex items-center space-x-2 rounded-xl bg-[#5B6CFF] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#4E5EEB]"
+                  className="flex w-full sm:w-auto items-center justify-center space-x-2 rounded-xl bg-[#5B6CFF] px-4 py-2.5 sm:py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#4E5EEB]"
                 >
                   {isSaved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
                   <span>{isSaved ? 'Settings Saved' : 'Save Routing Policies'}</span>
@@ -233,101 +222,107 @@ export const SettingsView: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Right: Gmail Accounts Management */}
+        {/* Right: User Authentication & Profile */}
         <div className="space-y-6">
           <div className="rounded-2xl border border-white/[0.08] bg-[#141720]/80 p-6 backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-white">Gmail Identity Tags</h3>
+                <h3 className="text-sm font-semibold text-white">User Authentication & Credentials</h3>
                 <p className="text-xs text-[#8A94A6]">
-                  Organize and track which Google account owns which provider key.
+                  Dedicated gateway identity with isolated keys, tokens, and telemetry.
                 </p>
               </div>
-              <button
-                id="add-gmail-tag-btn"
-                onClick={() => setIsAddingGmail(true)}
-                className="flex items-center space-x-1.5 rounded-xl border border-white/[0.08] bg-[#161B26] px-3 py-1.5 text-xs text-[#C5CEE0] hover:border-[#5B6CFF]/40 hover:text-white"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add Account</span>
-              </button>
+              {user ? (
+                <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                  Logged In
+                </span>
+              ) : (
+                <span className="rounded-md border border-white/[0.1] bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-[#8A94A6]">
+                  Default Workspace
+                </span>
+              )}
             </div>
 
-            <div className="mt-4 space-y-3">
-              {gmailAccounts.map((acc) => (
-                <div
-                  key={acc.id}
-                  className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#0E1116] p-3 text-xs"
-                >
+            <div className="mt-4 rounded-xl border border-white/[0.06] bg-[#0E1116] p-4 text-xs space-y-3">
+              {user ? (
+                <>
                   <div className="flex items-center space-x-3">
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-white font-semibold text-xs"
-                      style={{ backgroundColor: acc.avatarColor }}
-                    >
-                      {acc.name.slice(0, 1).toUpperCase()}
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#5B6CFF]/20 text-[#8C9BFF] font-semibold text-sm border border-[#5B6CFF]/30">
+                      {user.username.slice(0, 1).toUpperCase()}
                     </div>
                     <div>
-                      <div className="flex items-center space-x-1.5">
-                        <span className="font-medium text-white">{acc.name}</span>
-                        {acc.isPrimary && (
-                          <span className="rounded bg-[#5B6CFF]/20 px-1.5 py-0.2 text-[10px] text-[#8C9BFF]">
-                            Primary
-                          </span>
-                        )}
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-white text-sm">{user.name || user.username}</span>
+                        <span className="rounded bg-[#5B6CFF]/20 px-1.5 py-0.2 text-[10px] font-medium text-[#8C9BFF]">
+                          @{user.username}
+                        </span>
                       </div>
-                      <span className="text-[11px] text-[#717B8F]">{acc.email}</span>
+                      <span className="text-[11px] text-[#717B8F] font-mono">{user.email || `@${user.username}`}</span>
                     </div>
                   </div>
 
-                  <span className="rounded bg-white/[0.06] px-2 py-0.5 text-[11px] text-[#8A94A6]">
-                    {acc.keyCount || 0} keys tagged
-                  </span>
-                </div>
-              ))}
+                  <div className="border-t border-white/[0.06] pt-3 text-xs text-[#8A94A6] space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span>Authentication Scheme:</span>
+                      <span className="font-mono text-white text-[11px]">PBKDF2-HMAC-SHA512</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Account Status:</span>
+                      <span className="text-emerald-400">Active & Verified</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end space-x-2 pt-2">
+                    <button
+                      onClick={onLogout}
+                      className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-500/20 transition"
+                    >
+                      Sign Out
+                    </button>
+                    <button
+                      onClick={onOpenAuthModal}
+                      className="rounded-xl border border-white/[0.1] bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-white hover:bg-white/[0.1] transition"
+                    >
+                      Switch Account
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center space-x-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.05] text-[#8A94A6] border border-white/[0.08]">
+                      <User className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-white">Default Local Workspace</span>
+                      <p className="text-[11px] text-[#717B8F]">
+                        Running with shared local session. Create an account to isolate your keys.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/[0.06] pt-3">
+                    <button
+                      onClick={onOpenAuthModal}
+                      className="w-full flex items-center justify-center space-x-2 rounded-xl bg-[#5B6CFF] py-2 text-xs font-medium text-white hover:bg-[#4E5EEB] transition"
+                    >
+                      <User className="h-3.5 w-3.5" />
+                      <span>Sign In or Create Account</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Add Gmail Form Modal */}
-            {isAddingGmail && (
-              <form onSubmit={handleCreateGmail} className="mt-4 rounded-xl border border-white/[0.08] bg-[#161B26] p-4 space-y-3 text-xs">
-                <h4 className="font-semibold text-white">Add Gmail Account Identity</h4>
-                <div>
-                  <label className="block text-[#C5CEE0]">Gmail Address</label>
-                  <input
-                    type="email"
-                    placeholder="name@gmail.com"
-                    value={newGmailEmail}
-                    onChange={(e) => setNewGmailEmail(e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-lg border border-white/[0.08] bg-[#0E1116] px-3 py-1.5 text-xs text-white focus:border-[#5B6CFF] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[#C5CEE0]">Account Label / Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Work AI Sandbox"
-                    value={newGmailName}
-                    onChange={(e) => setNewGmailName(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-white/[0.08] bg-[#0E1116] px-3 py-1.5 text-xs text-white focus:border-[#5B6CFF] focus:outline-none"
-                  />
-                </div>
-                <div className="flex justify-end space-x-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingGmail(false)}
-                    className="rounded-lg border border-white/[0.08] px-3 py-1 text-xs text-[#8A94A6] hover:text-white"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-[#5B6CFF] px-3 py-1 text-xs font-medium text-white hover:bg-[#4E5EEB]"
-                  >
-                    Add Tag
-                  </button>
-                </div>
-              </form>
-            )}
+            <div className="mt-4 rounded-xl border border-[#5B6CFF]/20 bg-[#5B6CFF]/5 p-3 text-xs text-[#8A94A6] space-y-1">
+              <div className="flex items-center space-x-1.5 font-medium text-white">
+                <ShieldCheck className="h-3.5 w-3.5 text-[#5B6CFF]" />
+                <span>Zero-Knowledge Architecture</span>
+              </div>
+              <p className="text-[11px] text-[#8A94A6] leading-relaxed">
+                Passwords are never stored in plaintext. Each account generates a cryptographically random 16-byte salt and passes through 100,000 PBKDF2 iterations with SHA-512 before persistence.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -377,13 +372,13 @@ export const SettingsView: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {onTestDatabase && (
               <button
                 id="btn-test-db-connection"
                 onClick={onTestDatabase}
                 disabled={isDbTesting}
-                className="flex items-center space-x-1.5 rounded-xl border border-white/[0.12] bg-[#161924] px-3 py-2 text-xs font-medium text-white transition hover:border-white/[0.2] hover:bg-[#1c202e] disabled:opacity-50"
+                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 rounded-xl border border-white/[0.12] bg-[#161924] px-3 py-2 text-xs font-medium text-white transition hover:border-white/[0.2] hover:bg-[#1c202e] disabled:opacity-50"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${isDbTesting ? 'animate-spin text-[#5B6CFF]' : 'text-[#8A94A6]'}`} />
                 <span>{isDbTesting ? 'Pinging...' : 'Test Connection'}</span>
@@ -395,7 +390,7 @@ export const SettingsView: React.FC<Props> = ({
                 id="btn-sync-db"
                 onClick={onSyncDatabase}
                 disabled={isDbSyncing}
-                className="flex items-center space-x-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
+                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
               >
                 <HardDrive className={`h-3.5 w-3.5 ${isDbSyncing ? 'animate-bounce text-emerald-400' : 'text-emerald-400'}`} />
                 <span>{isDbSyncing ? 'Syncing...' : 'Sync Tables Now'}</span>
@@ -533,41 +528,41 @@ export const SettingsView: React.FC<Props> = ({
 
         {/* Configuration Checklist Grid */}
         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* Google OAuth Cloud Console Config */}
+          {/* API Gateway Ingress & OpenAI Proxy Config */}
           <div className="rounded-xl border border-white/[0.06] bg-[#0E1116] p-4 text-xs space-y-3">
             <div className="flex items-center space-x-2 text-white font-medium">
               <Globe className="h-4 w-4 text-[#5B6CFF]" />
-              <span>Google Cloud Console (OAuth 2.0 Client)</span>
+              <span>Production Ingress & Reverse Proxy</span>
             </div>
             <p className="text-[11px] text-[#8A94A6]">
-              Add the following URIs to your Google Cloud Console OAuth 2.0 Web Client credentials:
+              Standard OpenAI-compatible drop-in endpoints for external SDKs and clients:
             </p>
 
             <div className="space-y-2">
               <div>
-                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Authorized JavaScript Origin</span>
+                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">OpenAI Compatible Base URL</span>
                 <div className="mt-1 flex items-center justify-between rounded-lg bg-[#141720] px-3 py-2 border border-white/[0.04]">
-                  <code className="font-mono text-emerald-400 text-[11px]">https://nexusrouter.vercel.app</code>
+                  <code className="font-mono text-emerald-400 text-[11px]">https://nexusrouter.vercel.app/v1</code>
                   <button
-                    onClick={() => copyToClipboard('https://nexusrouter.vercel.app', 'origin')}
+                    onClick={() => copyToClipboard('https://nexusrouter.vercel.app/v1', 'v1_url')}
                     className="ml-2 flex items-center space-x-1 text-[#8A94A6] hover:text-white"
                   >
-                    {copiedItem === 'origin' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                    <span className="text-[10px]">{copiedItem === 'origin' ? 'Copied' : 'Copy'}</span>
+                    {copiedItem === 'v1_url' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    <span className="text-[10px]">{copiedItem === 'v1_url' ? 'Copied' : 'Copy'}</span>
                   </button>
                 </div>
               </div>
 
               <div>
-                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Authorized Redirect URI</span>
+                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Chat Completions Route</span>
                 <div className="mt-1 flex items-center justify-between rounded-lg bg-[#141720] px-3 py-2 border border-white/[0.04]">
-                  <code className="font-mono text-emerald-400 text-[11px]">https://nexusrouter.vercel.app/auth/google/callback</code>
+                  <code className="font-mono text-emerald-400 text-[11px]">/v1/chat/completions</code>
                   <button
-                    onClick={() => copyToClipboard('https://nexusrouter.vercel.app/auth/google/callback', 'callback')}
+                    onClick={() => copyToClipboard('https://nexusrouter.vercel.app/v1/chat/completions', 'chat_url')}
                     className="ml-2 flex items-center space-x-1 text-[#8A94A6] hover:text-white"
                   >
-                    {copiedItem === 'callback' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                    <span className="text-[10px]">{copiedItem === 'callback' ? 'Copied' : 'Copy'}</span>
+                    {copiedItem === 'chat_url' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    <span className="text-[10px]">{copiedItem === 'chat_url' ? 'Copied' : 'Copy'}</span>
                   </button>
                 </div>
               </div>
@@ -585,6 +580,17 @@ export const SettingsView: React.FC<Props> = ({
             </p>
 
             <div className="space-y-2">
+              <div>
+                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Firebase Provisioned Project & Client SDK</span>
+                <div className="mt-1 flex items-center justify-between rounded-lg bg-[#141720] px-3 py-2 border border-white/[0.04]">
+                  <div className="flex items-center space-x-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <code className="font-mono text-emerald-400 text-[11px]">triple-outlook-k07pf</code>
+                  </div>
+                  <span className="text-[10px] text-[#8A94A6] uppercase tracking-wider font-semibold">Client SDK Active</span>
+                </div>
+              </div>
+
               <div>
                 <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Firebase Auth Authorized Domain</span>
                 <div className="mt-1 flex items-center justify-between rounded-lg bg-[#141720] px-3 py-2 border border-white/[0.04]">

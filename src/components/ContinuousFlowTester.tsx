@@ -10,7 +10,6 @@ import {
   Play,
   RefreshCw,
   Shield,
-  Sparkles,
   Zap,
 } from 'lucide-react';
 import { PROVIDERS } from '../data/providers';

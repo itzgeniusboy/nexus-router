@@ -14,7 +14,6 @@ import {
   Server,
   Share2,
   Sliders,
-  Sparkles,
   Wind,
   Zap,
 } from 'lucide-react';
@@ -33,8 +32,8 @@ export const ProviderIcon: React.FC<Props> = ({ provider, className = 'w-5 h-5',
     case 'anthropic':
       return <Brain className={className} size={size} />;
     case 'google':
-      // Clean Cloud / Layers icon strictly honoring: "Don't use gemini logo or icon"
-      return <Layers className={className} size={size} />;
+      // Clean generic Cpu / Hardware chip icon strictly avoiding any gemini logo or icon
+      return <Cpu className={className} size={size} />;
     case 'groq':
       return <Zap className={className} size={size} />;
     case 'deepseek':
@@ -50,13 +49,13 @@ export const ProviderIcon: React.FC<Props> = ({ provider, className = 'w-5 h-5',
     case 'perplexity':
       return <Globe className={className} size={size} />;
     case 'together':
-      return <Cpu className={className} size={size} />;
+      return <Server className={className} size={size} />;
     case 'fireworks':
       return <Flame className={className} size={size} />;
     case 'azure':
       return <Cloud className={className} size={size} />;
     case 'bedrock':
-      return <Server className={className} size={size} />;
+      return <Layers className={className} size={size} />;
     case 'custom':
     default:
       return <Sliders className={className} size={size} />;

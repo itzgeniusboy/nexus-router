@@ -80,11 +80,11 @@ export const OverviewView: React.FC<Props> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto">
             <button
               id="hero-test-flow-btn"
               onClick={onNavigateToTester}
-              className="flex items-center space-x-2 rounded-xl bg-[#5B6CFF] px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-[#5B6CFF]/20 transition hover:bg-[#4E5EEB] active:scale-[0.98]"
+              className="flex w-full sm:w-auto items-center justify-center space-x-2 rounded-xl bg-[#5B6CFF] px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-[#5B6CFF]/20 transition hover:bg-[#4E5EEB] active:scale-[0.98] text-center"
             >
               <RefreshCw className="h-4 w-4" />
               <span>Simulate Continuous Fallback</span>
@@ -92,7 +92,7 @@ export const OverviewView: React.FC<Props> = ({
             <button
               id="hero-view-vault-btn"
               onClick={onNavigateToKeys}
-              className="flex items-center space-x-2 rounded-xl border border-white/[0.1] bg-[#141822] px-4 py-2.5 text-sm font-medium text-[#C5CEE0] transition hover:border-white/[0.2] hover:text-white"
+              className="flex w-full sm:w-auto items-center justify-center space-x-2 rounded-xl border border-white/[0.1] bg-[#141822] px-4 py-2.5 text-sm font-medium text-[#C5CEE0] transition hover:border-white/[0.2] hover:text-white text-center"
             >
               <Key className="h-4 w-4 text-[#8A94A6]" />
               <span>Manage Key Vault</span>

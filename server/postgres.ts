@@ -220,11 +220,22 @@ export async function initPostgresTables(): Promise<boolean> {
       await client.query(`
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY,
-          email TEXT UNIQUE,
+          username TEXT UNIQUE,
+          password_hash TEXT,
+          password_salt TEXT,
+          email TEXT,
           name TEXT,
           avatar TEXT,
           created_at TIMESTAMPTZ DEFAULT NOW()
         );
+
+        -- Migrations for existing users table
+        DO $$ BEGIN
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS password_salt TEXT;
+        EXCEPTION WHEN others THEN NULL;
+        END $$;
 
         CREATE TABLE IF NOT EXISTS gmail_accounts (
           id TEXT PRIMARY KEY,
@@ -384,10 +395,11 @@ export async function pgUpsertGmailAccount(account: GmailAccount, userId = 'defa
       `
       INSERT INTO gmail_accounts (id, user_id, email, name, is_primary, avatar_color, added_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
-      ON CONFLICT (id) DO UPDATE SET
-        name = EXCLUDED.name,
-        is_primary = EXCLUDED.is_primary,
-        avatar_color = EXCLUDED.avatar_color;
+      ON CONFLICT (email) DO UPDATE SET
+        name = COALESCE(NULLIF(EXCLUDED.name, ''), gmail_accounts.name),
+        user_id = COALESCE(EXCLUDED.user_id, gmail_accounts.user_id),
+        is_primary = CASE WHEN EXCLUDED.is_primary = 1 THEN 1 ELSE gmail_accounts.is_primary END,
+        avatar_color = COALESCE(EXCLUDED.avatar_color, gmail_accounts.avatar_color);
     `,
       [
         account.id,
@@ -401,6 +413,42 @@ export async function pgUpsertGmailAccount(account: GmailAccount, userId = 'defa
     );
   } catch (err: any) {
     console.warn('[Supabase PG] Failed to upsert Gmail account:', err.message);
+  }
+}
+
+export async function pgUpsertUser(user: {
+  id: string;
+  username: string;
+  passwordHash: string;
+  passwordSalt: string;
+  name?: string;
+  avatar?: string;
+}): Promise<void> {
+  const pool = getPgPool();
+  if (!pool) return;
+  try {
+    await pool.query(
+      `
+      INSERT INTO users (id, username, password_hash, password_salt, name, avatar, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        username = EXCLUDED.username,
+        password_hash = EXCLUDED.password_hash,
+        password_salt = EXCLUDED.password_salt,
+        name = EXCLUDED.name,
+        avatar = EXCLUDED.avatar;
+    `,
+      [
+        user.id,
+        user.username,
+        user.passwordHash,
+        user.passwordSalt,
+        user.name || user.username,
+        user.avatar || null,
+      ]
+    );
+  } catch (err: any) {
+    console.warn('[Supabase PG] Failed to upsert user:', err.message);
   }
 }
 

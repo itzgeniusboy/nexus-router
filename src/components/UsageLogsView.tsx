@@ -36,7 +36,7 @@ export const UsageLogsView: React.FC<Props> = ({ logs, onClearLogs }) => {
       searchQuery === '' ||
       log.keyLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.gmailTag.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (log.gmailTag && log.gmailTag.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (log.promptPreview && log.promptPreview.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return matchesStatus && matchesSearch;
@@ -55,10 +55,10 @@ export const UsageLogsView: React.FC<Props> = ({ logs, onClearLogs }) => {
   return (
     <div className="space-y-6">
       {/* Top Filter Bar */}
-      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-white/[0.08] bg-[#141720]/70 p-4 backdrop-blur-sm md:flex-row md:items-center">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col justify-between gap-3.5 rounded-2xl border border-white/[0.08] bg-[#141720]/70 p-4 backdrop-blur-sm md:flex-row md:items-center">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3 flex-1">
           {/* Search */}
-          <div className="relative min-w-[240px]">
+          <div className="relative w-full sm:w-auto sm:min-w-[220px] flex-1">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#6C768A]" />
             <input
               id="search-logs-input"
@@ -71,13 +71,13 @@ export const UsageLogsView: React.FC<Props> = ({ logs, onClearLogs }) => {
           </div>
 
           {/* Status Filter */}
-          <div className="flex items-center space-x-2">
-            <Filter className="h-3.5 w-3.5 text-[#6C768A]" />
+          <div className="flex items-center space-x-2 w-full sm:w-auto">
+            <Filter className="h-3.5 w-3.5 text-[#6C768A] shrink-0" />
             <select
               id="status-filter-select"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-white/[0.08] bg-[#0E1116] px-3 py-2 text-xs text-[#C5CEE0] focus:border-[#5B6CFF] focus:outline-none"
+              className="w-full sm:w-auto rounded-xl border border-white/[0.08] bg-[#0E1116] px-3 py-2 text-xs text-[#C5CEE0] focus:border-[#5B6CFF] focus:outline-none cursor-pointer [&>option]:bg-[#161924] [&>option]:text-white"
             >
               <option value="all">All Logs ({logs.length})</option>
               <option value="success">Success</option>
@@ -88,10 +88,10 @@ export const UsageLogsView: React.FC<Props> = ({ logs, onClearLogs }) => {
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           <button
             onClick={exportLogsAsJson}
-            className="flex items-center space-x-1.5 rounded-xl border border-white/[0.08] bg-[#161B26] px-3 py-2 text-xs text-[#C5CEE0] hover:border-white/[0.2] hover:text-white"
+            className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 rounded-xl border border-white/[0.08] bg-[#161B26] px-3 py-2 text-xs text-[#C5CEE0] hover:border-white/[0.2] hover:text-white transition"
           >
             <Download className="h-3.5 w-3.5" />
             <span>Export JSON</span>
@@ -99,7 +99,7 @@ export const UsageLogsView: React.FC<Props> = ({ logs, onClearLogs }) => {
           <button
             id="clear-logs-btn"
             onClick={onClearLogs}
-            className="flex items-center space-x-1.5 rounded-xl border border-white/[0.08] bg-[#161B26] px-3 py-2 text-xs text-rose-400 hover:bg-rose-500/10"
+            className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 rounded-xl border border-white/[0.08] bg-[#161B26] px-3 py-2 text-xs text-rose-400 hover:bg-rose-500/10 transition"
           >
             <Trash2 className="h-3.5 w-3.5" />
             <span>Clear Logs</span>
@@ -141,7 +141,7 @@ export const UsageLogsView: React.FC<Props> = ({ logs, onClearLogs }) => {
                   <td className="p-4">
                     <div>
                       <div className="font-medium text-white">{log.keyLabel}</div>
-                      <div className="text-[11px] text-[#717B8F]">{log.gmailTag}</div>
+                      {log.gmailTag && <div className="text-[11px] text-[#717B8F]">{log.gmailTag}</div>}
                     </div>
                   </td>
                   <td className="p-4">{log.tokensUsed}</td>

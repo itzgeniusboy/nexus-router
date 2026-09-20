@@ -142,7 +142,7 @@ console.log(data.choices[0].message.content);`;
         <button
           id="create-master-token-btn"
           onClick={() => setIsCreateOpen(true)}
-          className="flex items-center space-x-2 rounded-xl bg-[#5B6CFF] px-4 py-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-[#4E5EEB] active:scale-[0.98]"
+          className="flex w-full sm:w-auto items-center justify-center space-x-2 rounded-xl bg-[#5B6CFF] px-4 py-2.5 text-xs font-medium text-white shadow-sm transition hover:bg-[#4E5EEB] active:scale-[0.98] shrink-0"
         >
           <Plus className="h-4 w-4" />
           <span>Generate Master Token</span>
@@ -154,7 +154,7 @@ console.log(data.choices[0].message.content);`;
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-2 text-emerald-400">
-              <KeyRound className="h-5 w-5" />
+              <KeyRound className="h-5 w-5 shrink-0" />
               <h3 className="text-sm font-semibold">New Master Token Created</h3>
             </div>
             <button
@@ -167,11 +167,11 @@ console.log(data.choices[0].message.content);`;
           <p className="mt-1 text-xs text-emerald-300/80">
             Please copy this token now. For security purposes, you won't be able to see it again.
           </p>
-          <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-[#0E1116] p-3 text-xs">
-            <span className="font-mono text-emerald-400">{newlyCreatedToken}</span>
+          <div className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 rounded-xl border border-emerald-500/30 bg-[#0E1116] p-3 text-xs">
+            <span className="font-mono text-emerald-400 break-all select-all">{newlyCreatedToken}</span>
             <button
               onClick={() => copyToClipboard(newlyCreatedToken, 'new-token')}
-              className="flex items-center space-x-1 rounded-lg bg-emerald-500/20 px-3 py-1 text-emerald-300 hover:bg-emerald-500/30"
+              className="flex items-center justify-center space-x-1 rounded-lg bg-emerald-500/20 px-3 py-1.5 text-emerald-300 hover:bg-emerald-500/30 shrink-0"
             >
               {copiedKey === 'new-token' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               <span>{copiedKey === 'new-token' ? 'Copied!' : 'Copy'}</span>
@@ -305,17 +305,17 @@ console.log(data.choices[0].message.content);`;
                 />
               </div>
 
-              <div className="flex justify-end space-x-3 border-t border-white/[0.08] pt-4">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:space-x-3 border-t border-white/[0.08] pt-4">
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(false)}
-                  className="rounded-xl border border-white/[0.1] bg-[#141822] px-4 py-2 text-xs font-medium text-[#8A94A6] hover:text-white transition"
+                  className="w-full sm:w-auto rounded-xl border border-white/[0.1] bg-[#141822] px-4 py-2.5 sm:py-2 text-xs font-medium text-[#8A94A6] hover:text-white transition text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-[#5B6CFF] px-4 py-2 text-xs font-medium text-white hover:bg-[#4E5EEB] transition"
+                  className="w-full sm:w-auto rounded-xl bg-[#5B6CFF] px-4 py-2.5 sm:py-2 text-xs font-medium text-white hover:bg-[#4E5EEB] transition text-center"
                 >
                   Generate Token
                 </button>

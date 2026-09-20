@@ -1,3 +1,4 @@
+import '../lib/three-setup';
 import React, { useRef, useState, useEffect, createContext, useContext } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Float } from '@react-three/drei';

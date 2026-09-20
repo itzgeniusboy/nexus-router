@@ -177,7 +177,7 @@ export async function dispatchAiRequest(params: DispatchParams): Promise<Dispatc
           id: selectedKey.id,
           label: selectedKey.label,
           maskedKey: selectedKey.maskedKey,
-          gmailTag: selectedKey.gmailTag,
+          gmailTag: selectedKey.gmailTag || '',
         },
         tokensUsed: callResult.tokensUsed,
         latencyMs,

@@ -41,12 +41,22 @@ function initTables(db: DbInterface) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
-      email TEXT UNIQUE,
+      username TEXT UNIQUE,
+      password_hash TEXT,
+      password_salt TEXT,
+      email TEXT,
       name TEXT,
       avatar TEXT,
       created_at TEXT
     );
+  `);
 
+  // Migrate existing users table if columns are missing
+  try { db.exec('ALTER TABLE users ADD COLUMN username TEXT;'); } catch {}
+  try { db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT;'); } catch {}
+  try { db.exec('ALTER TABLE users ADD COLUMN password_salt TEXT;'); } catch {}
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS gmail_accounts (
       id TEXT PRIMARY KEY,
       user_id TEXT,

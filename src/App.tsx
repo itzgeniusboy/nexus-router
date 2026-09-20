@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AuthModal } from './components/AuthModal';
 import { ContinuousFlowTester } from './components/ContinuousFlowTester';
 import { KeyVaultView } from './components/KeyVaultView';
 import { Navbar } from './components/Navbar';
@@ -9,7 +10,6 @@ import { UsageLogsView } from './components/UsageLogsView';
 import {
   ApiKeyItem,
   DatabaseStatus,
-  GmailAccount,
   ProviderId,
   RouterSettings,
   RouterToken,
@@ -22,12 +22,12 @@ export default function App() {
   const [keys, setKeys] = useState<ApiKeyItem[]>([]);
   const [tokens, setTokens] = useState<RouterToken[]>([]);
   const [logs, setLogs] = useState<UsageLog[]>([]);
-  const [gmailAccounts, setGmailAccounts] = useState<GmailAccount[]>([]);
-  const [selectedGmail, setSelectedGmail] = useState<string>('all');
   const [user, setUser] = useState<UserProfile | null>(null);
   const [dbStatus, setDbStatus] = useState<DatabaseStatus | null>(null);
   const [isDbTesting, setIsDbTesting] = useState(false);
   const [isDbSyncing, setIsDbSyncing] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
   const [settings, setSettings] = useState<RouterSettings>({
     rotationStrategy: 'round-robin',
     autoFallback: true,
@@ -43,25 +43,23 @@ export default function App() {
   // Fetch initial dashboard state & user session
   const fetchData = async () => {
     try {
-      const [sessionRes, keysRes, tokensRes, logsRes, gmailRes, settingsRes, dbRes] = await Promise.all([
+      const [sessionRes, keysRes, tokensRes, logsRes, settingsRes, dbRes] = await Promise.all([
         fetch('/api/auth/session').then((r) => r.json()).catch(() => ({})),
         fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
         fetch('/api/tokens').then((r) => r.json()).catch(() => ({})),
         fetch('/api/logs').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/gmail-accounts').then((r) => r.json()).catch(() => ({})),
         fetch('/api/settings').then((r) => r.json()).catch(() => ({})),
         fetch('/api/database/status').then((r) => r.json()).catch(() => ({})),
       ]);
 
       if (sessionRes.user) {
         setUser(sessionRes.user);
+      } else {
+        setUser(null);
       }
       if (keysRes.keys) setKeys(keysRes.keys);
       if (tokensRes.tokens) setTokens(tokensRes.tokens);
       if (logsRes.logs) setLogs(logsRes.logs);
-      if (gmailRes.accounts) {
-        setGmailAccounts(gmailRes.accounts);
-      }
       if (settingsRes.settings) setSettings(settingsRes.settings);
       if (dbRes.status) setDbStatus(dbRes.status);
     } catch (err) {
@@ -71,6 +69,73 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Manual Authentication Handlers (Username & Password)
+  const handleLogin = async (username: string, password: string) => {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to login');
+    }
+    setUser(data.user);
+    // Reload user-scoped data
+    const [keysRes, tokensRes, logsRes] = await Promise.all([
+      fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
+      fetch('/api/tokens').then((r) => r.json()).catch(() => ({})),
+      fetch('/api/logs').then((r) => r.json()).catch(() => ({})),
+    ]);
+    if (keysRes.keys) setKeys(keysRes.keys);
+    if (tokensRes.tokens) setTokens(tokensRes.tokens);
+    if (logsRes.logs) setLogs(logsRes.logs);
+  };
+
+  const handleRegister = async (username: string, password: string, name?: string) => {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, name }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to create account');
+    }
+    setUser(data.user);
+    // Reload user-scoped data
+    const [keysRes, tokensRes, logsRes] = await Promise.all([
+      fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
+      fetch('/api/tokens').then((r) => r.json()).catch(() => ({})),
+      fetch('/api/logs').then((r) => r.json()).catch(() => ({})),
+    ]);
+    if (keysRes.keys) setKeys(keysRes.keys);
+    if (tokensRes.tokens) setTokens(tokensRes.tokens);
+    if (logsRes.logs) setLogs(logsRes.logs);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      setUser(null);
+      // Reload default keys
+      const [keysRes, tokensRes, logsRes] = await Promise.all([
+        fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
+        fetch('/api/tokens').then((r) => r.json()).catch(() => ({})),
+        fetch('/api/logs').then((r) => r.json()).catch(() => ({})),
+      ]);
+      if (keysRes.keys) setKeys(keysRes.keys);
+      if (tokensRes.tokens) setTokens(tokensRes.tokens);
+      if (logsRes.logs) setLogs(logsRes.logs);
+    }
+  };
+
+  // Database actions
   const handleTestDatabase = async () => {
     setIsDbTesting(true);
     try {
@@ -94,14 +159,11 @@ export default function App() {
       if (data.status) {
         setDbStatus(data.status);
       }
-      // Refresh local keys, accounts, settings to reflect sync
-      const [keysRes, accountsRes, settingsRes] = await Promise.all([
+      const [keysRes, settingsRes] = await Promise.all([
         fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/gmail-accounts').then((r) => r.json()).catch(() => ({})),
         fetch('/api/settings').then((r) => r.json()).catch(() => ({})),
       ]);
       if (keysRes.keys) setKeys(keysRes.keys);
-      if (accountsRes.accounts) setGmailAccounts(accountsRes.accounts);
       if (settingsRes.settings) setSettings(settingsRes.settings);
     } catch (err) {
       console.error('Error syncing database:', err);
@@ -110,37 +172,12 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // Handlers for Google Auth Connection
-  const handleConnectGoogle = async (email: string, name?: string) => {
-    try {
-      const res = await fetch('/api/auth/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name }),
-      });
-      const data = await res.json();
-      if (data.success && data.user) {
-        setUser(data.user);
-        setSelectedGmail(data.user.email);
-        // Refresh accounts and keys
-        const accRes = await fetch('/api/gmail-accounts').then((r) => r.json());
-        if (accRes.accounts) setGmailAccounts(accRes.accounts);
-      }
-    } catch (err) {
-      console.error('Failed to link Google account:', err);
-    }
-  };
-
   // Handlers for Key CRUD
   const handleAddKey = async (params: {
     provider: ProviderId;
     label: string;
     rawKey: string;
-    gmailTag: string;
+    gmailTag?: string;
     priority: number;
     customBaseUrl?: string;
     customAuthHeader?: string;
@@ -153,10 +190,6 @@ export default function App() {
     const data = await res.json();
     if (data.success && data.key) {
       setKeys((prev) => [data.key, ...prev]);
-      // refresh gmail counts
-      fetch('/api/gmail-accounts')
-        .then((r) => r.json())
-        .then((d) => d.accounts && setGmailAccounts(d.accounts));
     }
   };
 
@@ -259,40 +292,26 @@ export default function App() {
     }
   };
 
-  const handleAddGmailAccount = async (email: string, name: string) => {
-    const res = await fetch('/api/gmail-accounts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, name }),
-    });
-    const data = await res.json();
-    if (data.success && data.account) {
-      setGmailAccounts((prev) => [...prev, data.account]);
-    }
-  };
-
   return (
-    <div className="relative min-h-screen bg-[#0B0D10] text-[#E1E4EA]">
+    <div className="relative min-h-screen w-full max-w-full overflow-x-hidden bg-[#0B0D10] text-[#E1E4EA]">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        gmailAccounts={gmailAccounts}
-        selectedGmail={selectedGmail}
-        setSelectedGmail={setSelectedGmail}
         onOpenAddKey={() => {
           setActiveTab('keys');
           setIsAddKeyModalOpen(true);
         }}
-        onOpenAddGmail={() => setActiveTab('settings')}
         totalKeysCount={keys.length}
         user={user}
-        onConnectGoogle={handleConnectGoogle}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        onLogout={handleLogout}
         databaseStatus={dbStatus}
       />
 
-      {/* Main Content Area - Clean, Flat, High-Legibility Data Views */}
-      <div className="flex min-h-[calc(100vh-120px)] flex-col">
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+      {/* Main Content Area */}
+      <div className="flex min-h-[calc(100vh-120px)] w-full max-w-full flex-col overflow-x-hidden">
+        <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-6 sm:px-6 sm:py-8 min-w-0">
           {isLoading ? (
             <div className="flex h-64 items-center justify-center">
               <div className="flex items-center space-x-3 text-sm text-[#8A94A6]">
@@ -315,9 +334,6 @@ export default function App() {
               {activeTab === 'keys' && (
                 <KeyVaultView
                   keys={keys}
-                  gmailAccounts={gmailAccounts}
-                  selectedGmail={selectedGmail}
-                  setSelectedGmail={setSelectedGmail}
                   onAddKey={handleAddKey}
                   onToggleKey={handleToggleKey}
                   onDeleteKey={handleDeleteKey}
@@ -332,7 +348,6 @@ export default function App() {
                 <ContinuousFlowTester
                   keys={keys}
                   onRefreshLogs={handleRefreshLogs}
-                  selectedGmail={selectedGmail}
                 />
               )}
 
@@ -351,9 +366,10 @@ export default function App() {
               {activeTab === 'settings' && (
                 <SettingsView
                   settings={settings}
-                  gmailAccounts={gmailAccounts}
+                  user={user}
                   onUpdateSettings={handleUpdateSettings}
-                  onAddGmailAccount={handleAddGmailAccount}
+                  onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                  onLogout={handleLogout}
                   databaseStatus={dbStatus}
                   onTestDatabase={handleTestDatabase}
                   onSyncDatabase={handleSyncDatabase}
@@ -367,12 +383,21 @@ export default function App() {
 
         {/* Minimal Footer */}
         <footer className="border-t border-white/[0.04] bg-[#0B0D10]/90 py-4 text-center text-xs text-[#6C768A]">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 px-4 sm:px-6 lg:px-8 text-center sm:text-left">
             <span>Nexus Router Gateway • Port 3000 Ingress</span>
-            <span>AES-256-GCM Encrypted Vault • Rate-Limit Auto-Rotation Active</span>
+            <span>AES-256-GCM Encrypted Vault • PBKDF2 Manual Authentication</span>
           </div>
         </footer>
       </div>
+
+      {/* Auth Modal for Settings View button */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        currentUser={user}
+      />
     </div>
   );
 }

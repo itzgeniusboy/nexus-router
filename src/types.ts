@@ -36,7 +36,7 @@ export interface ApiKeyItem {
   label: string;
   maskedKey: string;
   encryptedKey: string;
-  gmailTag: string;
+  gmailTag?: string;
   status: KeyStatus;
   priority: number; // 1 = highest, 5 = lowest
   totalRequests: number;
@@ -78,7 +78,7 @@ export interface UsageLog {
   provider: ProviderId;
   keyId: string;
   keyLabel: string;
-  gmailTag: string;
+  gmailTag?: string;
   model: string;
   tokensUsed: number;
   status: 'success' | 'fallback_recovered' | 'rate_limited' | 'error';
@@ -100,9 +100,10 @@ export interface RouterSettings {
 
 export interface UserProfile {
   userId: string;
-  email: string;
+  username: string;
   name: string;
   avatar?: string;
+  email?: string;
 }
 
 export interface DatabaseStatus {

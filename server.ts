@@ -6,7 +6,7 @@ import session from 'express-session';
 import passport from 'passport';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { configurePassport, createOrUpdateGoogleUser, getUserByEmail, getUserById } from './server/auth';
+import { configurePassport, getUserById, loginUser, registerUser } from './server/auth';
 import { dispatchAiRequest } from './server/router';
 import { decryptKey, maskApiKey, routerStore } from './server/store';
 import { executeProviderCall, AuthError, RateLimitError, ProviderError } from './server/providers/index.ts';
@@ -136,107 +136,58 @@ app.post('/api/database/sync', async (req, res) => {
   }
 });
 
-// --- Auth Endpoints (Task 3: Google OAuth & Gmail tagging) ---
-app.get('/auth/google', (req, res, next) => {
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    return res.redirect('/?auth_error=missing_google_client_id');
+// --- Manual Authentication Endpoints (Username & Password) ---
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const { username, password, name } = req.body;
+    const user = registerUser(username, password, name);
+    (req.session as any).userId = user.userId;
+    req.session.save((err) => {
+      if (err) {
+        return res.status(500).json({ success: false, error: 'Failed to initialize session' });
+      }
+      res.status(201).json({ success: true, user });
+    });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
   }
-  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 
-app.get(
-  '/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/?auth_error=oauth_failed' }),
-  (req, res) => {
-    res.redirect('/');
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = loginUser(username, password);
+    (req.session as any).userId = user.userId;
+    req.session.save((err) => {
+      if (err) {
+        return res.status(500).json({ success: false, error: 'Failed to initialize session' });
+      }
+      res.json({ success: true, user });
+    });
+  } catch (err: any) {
+    res.status(401).json({ success: false, error: err.message });
   }
-);
+});
 
-app.post('/api/auth/logout', (req, res, next) => {
-  req.logout((err) => {
-    if (err) return next(err);
+app.post('/api/auth/logout', (req, res) => {
+  if (req.session) {
     req.session.destroy(() => {
+      res.clearCookie('connect.sid');
       res.json({ success: true, message: 'Logged out successfully' });
     });
-  });
+  } else {
+    res.json({ success: true, message: 'Logged out successfully' });
+  }
 });
 
 app.get('/api/auth/session', (req, res) => {
-  let user = (req.user as any) || null;
-  const userId = (req as any).userId || 'default-user';
-
-  if (!user && userId) {
-    user = getUserById(userId);
-  }
-
-  if (!user && userId === 'default-user') {
-    const defaultAccounts = routerStore.getGmailAccounts('default-user');
-    const primaryEmail = defaultAccounts[0]?.email || 'admin@gateway.internal';
-    user = {
-      userId: 'default-user',
-      email: primaryEmail,
-      name: defaultAccounts[0]?.name || 'Admin',
-    };
-  }
-
-  const appUrl =
-    process.env.APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://nexusrouter.vercel.app');
-  const callbackUrl = process.env.GOOGLE_CALLBACK_URL || `${appUrl}/auth/google/callback`;
+  const sessionUserId = (req.session as any)?.userId || (req.user as any)?.userId;
+  let user = sessionUserId ? getUserById(sessionUserId) : null;
 
   res.json({
     authenticated: Boolean(user),
-    user,
-    googleClientIdConfigured: Boolean(process.env.GOOGLE_CLIENT_ID),
-    deploymentUrl: appUrl,
-    callbackUrl,
-    authorizedOrigin: appUrl,
+    user: user || null,
   });
-});
-
-app.post('/api/auth/connect', (req, res) => {
-  const { email, name, avatar } = req.body;
-  if (!email || !email.includes('@')) {
-    return res.status(400).json({ success: false, error: 'Valid email address required' });
-  }
-
-  const user = createOrUpdateGoogleUser({
-    email,
-    name: name || email.split('@')[0],
-    avatar,
-  });
-
-  (req.session as any).userId = user.userId;
-  res.json({ success: true, user });
-});
-
-app.post('/api/auth/google/credential', async (req, res) => {
-  const { credential } = req.body;
-  if (!credential) {
-    return res.status(400).json({ success: false, error: 'Missing credential token' });
-  }
-
-  try {
-    // Decodes the JWT payload from Google Identity Services
-    const payloadPart = credential.split('.')[1];
-    const decodedJson = Buffer.from(payloadPart, 'base64').toString('utf8');
-    const googleProfile = JSON.parse(decodedJson);
-
-    if (!googleProfile.email) {
-      return res.status(400).json({ success: false, error: 'Invalid Google token: email missing' });
-    }
-
-    const user = createOrUpdateGoogleUser({
-      email: googleProfile.email,
-      name: googleProfile.name || googleProfile.email.split('@')[0],
-      avatar: googleProfile.picture,
-    });
-
-    (req.session as any).userId = user.userId;
-    res.json({ success: true, user });
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: 'Failed to verify Google token: ' + err.message });
-  }
 });
 
 // --- API Keys Endpoints ---
@@ -646,7 +597,11 @@ app.post('/api/v1/chat/completions', routerRateLimiter, async (req, res) => {
 async function start() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+        ws: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
