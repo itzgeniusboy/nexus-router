@@ -11,24 +11,55 @@ import { dispatchAiRequest } from './server/router';
 import { decryptKey, maskApiKey, routerStore } from './server/store';
 import { executeProviderCall, AuthError, RateLimitError, ProviderError } from './server/providers/index.ts';
 import { DEFAULT_PROVIDER_MODELS } from './server/providers/constants';
+import { getDatabaseMeta, testPostgresConnection } from './server/postgres';
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(cors({ origin: true, credentials: true }));
+// Enable reverse proxy support for Vercel, Cloud Run, and Cloudflare
+app.set('trust proxy', 1);
+
+// Allowed origins for CORS: production Vercel deployment, dev servers, and preview environments
+const allowedOrigins = [
+  'https://nexusrouter.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  process.env.APP_URL,
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
+].filter(Boolean) as string[];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.endsWith('.run.app') ||
+        origin.includes('localhost')
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Session and Passport configuration
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'ai-router-secure-session-key-32chars',
+    secret: process.env.SESSION_SECRET || 'nexus-router-secure-session-key-32chars',
     resave: false,
     saveUninitialized: false,
+    proxy: true,
     cookie: {
-      secure: false, // compatible with HTTP dev preview and HTTPS
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   })
@@ -76,6 +107,35 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Database & Persistence management endpoints
+app.get('/api/database/status', async (req, res) => {
+  try {
+    const status = await testPostgresConnection();
+    res.json({ success: true, status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/database/test', async (req, res) => {
+  try {
+    const status = await testPostgresConnection();
+    res.json({ success: true, status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/database/sync', async (req, res) => {
+  try {
+    const syncSuccess = await routerStore.syncWithPostgres();
+    const status = await testPostgresConnection();
+    res.json({ success: syncSuccess, status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // --- Auth Endpoints (Task 3: Google OAuth & Gmail tagging) ---
 app.get('/auth/google', (req, res, next) => {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
@@ -119,10 +179,18 @@ app.get('/api/auth/session', (req, res) => {
     };
   }
 
+  const appUrl =
+    process.env.APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://nexusrouter.vercel.app');
+  const callbackUrl = process.env.GOOGLE_CALLBACK_URL || `${appUrl}/auth/google/callback`;
+
   res.json({
     authenticated: Boolean(user),
     user,
     googleClientIdConfigured: Boolean(process.env.GOOGLE_CLIENT_ID),
+    deploymentUrl: appUrl,
+    callbackUrl,
+    authorizedOrigin: appUrl,
   });
 });
 
@@ -594,6 +662,10 @@ async function start() {
   if (!process.env.VERCEL) {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`[Nexus Router] Server listening on http://0.0.0.0:${PORT}`);
+      // Sync with Supabase / PostgreSQL in background if configured
+      routerStore.syncWithPostgres().catch((err) => {
+        console.warn('[Nexus Router] Background PostgreSQL sync notice:', err.message);
+      });
     });
   }
 }

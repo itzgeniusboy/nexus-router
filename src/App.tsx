@@ -8,6 +8,7 @@ import { SettingsView } from './components/SettingsView';
 import { UsageLogsView } from './components/UsageLogsView';
 import {
   ApiKeyItem,
+  DatabaseStatus,
   GmailAccount,
   ProviderId,
   RouterSettings,
@@ -24,6 +25,9 @@ export default function App() {
   const [gmailAccounts, setGmailAccounts] = useState<GmailAccount[]>([]);
   const [selectedGmail, setSelectedGmail] = useState<string>('all');
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [dbStatus, setDbStatus] = useState<DatabaseStatus | null>(null);
+  const [isDbTesting, setIsDbTesting] = useState(false);
+  const [isDbSyncing, setIsDbSyncing] = useState(false);
   const [settings, setSettings] = useState<RouterSettings>({
     rotationStrategy: 'round-robin',
     autoFallback: true,
@@ -39,13 +43,14 @@ export default function App() {
   // Fetch initial dashboard state & user session
   const fetchData = async () => {
     try {
-      const [sessionRes, keysRes, tokensRes, logsRes, gmailRes, settingsRes] = await Promise.all([
+      const [sessionRes, keysRes, tokensRes, logsRes, gmailRes, settingsRes, dbRes] = await Promise.all([
         fetch('/api/auth/session').then((r) => r.json()).catch(() => ({})),
         fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
         fetch('/api/tokens').then((r) => r.json()).catch(() => ({})),
         fetch('/api/logs').then((r) => r.json()).catch(() => ({})),
         fetch('/api/gmail-accounts').then((r) => r.json()).catch(() => ({})),
         fetch('/api/settings').then((r) => r.json()).catch(() => ({})),
+        fetch('/api/database/status').then((r) => r.json()).catch(() => ({})),
       ]);
 
       if (sessionRes.user) {
@@ -56,15 +61,52 @@ export default function App() {
       if (logsRes.logs) setLogs(logsRes.logs);
       if (gmailRes.accounts) {
         setGmailAccounts(gmailRes.accounts);
-        if (selectedGmail === 'all' && gmailRes.accounts.length > 0) {
-          // Keep 'all' or default to primary
-        }
       }
       if (settingsRes.settings) setSettings(settingsRes.settings);
+      if (dbRes.status) setDbStatus(dbRes.status);
     } catch (err) {
       console.error('Error fetching dashboard state:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTestDatabase = async () => {
+    setIsDbTesting(true);
+    try {
+      const res = await fetch('/api/database/test', { method: 'POST' });
+      const data = await res.json();
+      if (data.status) {
+        setDbStatus(data.status);
+      }
+    } catch (err) {
+      console.error('Error testing database:', err);
+    } finally {
+      setIsDbTesting(false);
+    }
+  };
+
+  const handleSyncDatabase = async () => {
+    setIsDbSyncing(true);
+    try {
+      const res = await fetch('/api/database/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.status) {
+        setDbStatus(data.status);
+      }
+      // Refresh local keys, accounts, settings to reflect sync
+      const [keysRes, accountsRes, settingsRes] = await Promise.all([
+        fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
+        fetch('/api/gmail-accounts').then((r) => r.json()).catch(() => ({})),
+        fetch('/api/settings').then((r) => r.json()).catch(() => ({})),
+      ]);
+      if (keysRes.keys) setKeys(keysRes.keys);
+      if (accountsRes.accounts) setGmailAccounts(accountsRes.accounts);
+      if (settingsRes.settings) setSettings(settingsRes.settings);
+    } catch (err) {
+      console.error('Error syncing database:', err);
+    } finally {
+      setIsDbSyncing(false);
     }
   };
 
@@ -237,11 +279,15 @@ export default function App() {
         gmailAccounts={gmailAccounts}
         selectedGmail={selectedGmail}
         setSelectedGmail={setSelectedGmail}
-        onOpenAddKey={() => setIsAddKeyModalOpen(true)}
+        onOpenAddKey={() => {
+          setActiveTab('keys');
+          setIsAddKeyModalOpen(true);
+        }}
         onOpenAddGmail={() => setActiveTab('settings')}
         totalKeysCount={keys.length}
         user={user}
         onConnectGoogle={handleConnectGoogle}
+        databaseStatus={dbStatus}
       />
 
       {/* Main Content Area - Clean, Flat, High-Legibility Data Views */}
@@ -308,6 +354,11 @@ export default function App() {
                   gmailAccounts={gmailAccounts}
                   onUpdateSettings={handleUpdateSettings}
                   onAddGmailAccount={handleAddGmailAccount}
+                  databaseStatus={dbStatus}
+                  onTestDatabase={handleTestDatabase}
+                  onSyncDatabase={handleSyncDatabase}
+                  isDbTesting={isDbTesting}
+                  isDbSyncing={isDbSyncing}
                 />
               )}
             </>

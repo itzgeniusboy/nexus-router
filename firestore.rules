@@ -1,0 +1,168 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------
+    // Global Safety Net & Helpers
+    // ---------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Default deny for all unspecified paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ---------------------------------------------------------
+    // 1. Users Collection
+    // ---------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // PII Isolation: No listing users
+
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && incoming().keys().hasAll(['id', 'email', 'name', 'createdAt'])
+        && incoming().id == userId
+        && incoming().email is string && incoming().email.size() <= 254
+        && incoming().name is string && incoming().name.size() <= 128;
+
+      allow update: if isOwner(userId)
+        && incoming().id == existing().id
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().name is string && incoming().name.size() <= 128;
+
+      allow delete: if isOwner(userId);
+    }
+
+    // ---------------------------------------------------------
+    // 2. Encrypted API Keys Collection
+    // ---------------------------------------------------------
+    match /api_keys/{keyId} {
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && isValidId(keyId)
+        && incoming().keys().hasAll(['id', 'userId', 'provider', 'label', 'maskedKey', 'encryptedKey', 'gmailTag', 'status', 'priority', 'createdAt', 'enabled'])
+        && incoming().userId == request.auth.uid
+        && incoming().id == keyId
+        && incoming().provider is string && incoming().provider.size() <= 64
+        && incoming().label is string && incoming().label.size() <= 128
+        && incoming().maskedKey is string && incoming().maskedKey.size() <= 128
+        && incoming().encryptedKey is string && incoming().encryptedKey.size() <= 2048
+        && incoming().priority is int && incoming().priority >= 1 && incoming().priority <= 5;
+
+      allow update: if isSignedIn()
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt;
+
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------
+    // 3. Tagged Gmail Accounts Collection
+    // ---------------------------------------------------------
+    match /gmail_accounts/{accountId} {
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && isValidId(accountId)
+        && incoming().keys().hasAll(['id', 'userId', 'email', 'name', 'isPrimary', 'avatarColor', 'addedAt'])
+        && incoming().userId == request.auth.uid
+        && incoming().id == accountId
+        && incoming().email is string && incoming().email.size() <= 254
+        && incoming().name is string && incoming().name.size() <= 128;
+
+      allow update: if isSignedIn()
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().id == existing().id
+        && incoming().addedAt == existing().addedAt;
+
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------
+    // 4. Master Router Tokens Collection
+    // ---------------------------------------------------------
+    match /router_tokens/{tokenId} {
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && isValidId(tokenId)
+        && incoming().keys().hasAll(['id', 'userId', 'label', 'tokenPrefix', 'createdAt', 'totalCalls'])
+        && incoming().userId == request.auth.uid
+        && incoming().id == tokenId
+        && incoming().label is string && incoming().label.size() <= 128
+        && incoming().tokenPrefix is string && incoming().tokenPrefix.size() <= 64;
+
+      allow update: if isSignedIn()
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt;
+
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------
+    // 5. Usage & Audit Logs Collection
+    // ---------------------------------------------------------
+    match /usage_logs/{logId} {
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && isValidId(logId)
+        && incoming().keys().hasAll(['id', 'userId', 'timestamp', 'provider', 'keyId', 'status', 'latencyMs'])
+        && incoming().userId == request.auth.uid
+        && incoming().id == logId;
+
+      allow update: if false; // Audit logs are strictly immutable
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------
+    // 6. Router Settings Collection
+    // ---------------------------------------------------------
+    match /settings/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && incoming().userId == userId
+        && incoming().keys().hasAll(['userId', 'rotationStrategy', 'autoFallback', 'maxFallbackRetries', 'cooldownSeconds', 'rateLimitTolerance', 'logRetentionDays']);
+
+      allow update: if isOwner(userId)
+        && incoming().userId == existing().userId;
+
+      allow delete: if isOwner(userId);
+    }
+  }
+}

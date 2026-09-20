@@ -62,17 +62,17 @@ export const GoogleAuthModal: React.FC<Props> = ({
   const modalContent = (
     <div
       id="google-auth-modal-portal"
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-[2px] transition-all duration-200"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm transition-all duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="relative my-auto w-full max-w-lg max-h-[92vh] flex flex-col rounded-2xl border border-white/[0.12] bg-[#14161F] shadow-2xl shadow-black/80 animate-in fade-in zoom-in-95 duration-150"
+        className="relative my-auto w-full max-w-lg max-h-[92vh] flex flex-col rounded-2xl border border-white/[0.14] bg-[#161924] shadow-2xl shadow-black animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-4 shrink-0 bg-[#161924] rounded-t-2xl">
+        <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-4 shrink-0 bg-[#191D2B] rounded-t-2xl">
           <div className="flex items-center space-x-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#5B6CFF]/20 text-[#5B6CFF] border border-[#5B6CFF]/30">
               <Globe className="h-5 w-5" />
@@ -95,7 +95,7 @@ export const GoogleAuthModal: React.FC<Props> = ({
         <div className="overflow-y-auto p-6 space-y-5 text-xs">
           {/* Status badge if already connected */}
           {currentUser && (
-            <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400">
+            <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-400">
               <div className="flex items-center space-x-2">
                 <Check className="h-4 w-4 shrink-0" />
                 <span>
@@ -108,32 +108,32 @@ export const GoogleAuthModal: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Quick pick from known accounts */}
+          {/* Connected accounts dropdown */}
           {existingAccounts.length > 0 && (
-            <div>
-              <label className="block font-medium text-[#C5CEE0] mb-2">
-                Quick Select Known Account:
+            <div className="rounded-xl border border-white/[0.08] bg-[#10131C] p-3.5 space-y-2">
+              <label className="block font-medium text-[#C5CEE0]">
+                Choose From Connected Google Accounts:
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <select
+                value={emailInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const selected = existingAccounts.find((a) => a.email === val);
+                  if (selected) {
+                    handleQuickSelect(selected.email, selected.name);
+                  } else {
+                    setEmailInput(val);
+                  }
+                }}
+                className="w-full rounded-xl border border-white/[0.14] bg-[#0E121B] px-3 py-2 text-xs text-white focus:border-[#5B6CFF] focus:outline-none [&>option]:bg-[#161924] [&>option]:text-white"
+              >
+                <option value="">-- Select or type a custom address below --</option>
                 {existingAccounts.map((acc) => (
-                  <button
-                    key={acc.id}
-                    type="button"
-                    onClick={() => handleQuickSelect(acc.email, acc.name)}
-                    className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition ${
-                      emailInput === acc.email
-                        ? 'border-[#5B6CFF] bg-[#5B6CFF]/15 text-white'
-                        : 'border-white/[0.06] bg-[#0E1117] text-[#9DA8BE] hover:border-white/[0.15] hover:text-white'
-                    }`}
-                  >
-                    <div className="truncate mr-2">
-                      <div className="font-medium text-white truncate">{acc.name}</div>
-                      <div className="text-[10px] text-[#717B8F] truncate">{acc.email}</div>
-                    </div>
-                    <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-60" />
-                  </button>
+                  <option key={acc.id} value={acc.email}>
+                    {acc.name} ({acc.email})
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
           )}
 
@@ -151,7 +151,7 @@ export const GoogleAuthModal: React.FC<Props> = ({
                   placeholder="e.g. yourname@gmail.com"
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
-                  className="w-full rounded-xl border border-white/[0.1] bg-[#0B0D12] py-2.5 pl-9 pr-3 text-xs text-white placeholder-[#6C768A] focus:border-[#5B6CFF] focus:ring-1 focus:ring-[#5B6CFF] focus:outline-none"
+                  className="w-full rounded-xl border border-white/[0.15] bg-[#0E121B] py-2.5 pl-9 pr-3 text-xs text-white placeholder-[#717B8F] focus:border-[#5B6CFF] focus:bg-[#121622] focus:ring-1 focus:ring-[#5B6CFF] focus:outline-none"
                 />
               </div>
             </div>
@@ -167,29 +167,29 @@ export const GoogleAuthModal: React.FC<Props> = ({
                   placeholder="e.g. Personal Sandbox, Work Production"
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
-                  className="w-full rounded-xl border border-white/[0.1] bg-[#0B0D12] py-2.5 pl-9 pr-3 text-xs text-white placeholder-[#6C768A] focus:border-[#5B6CFF] focus:ring-1 focus:ring-[#5B6CFF] focus:outline-none"
+                  className="w-full rounded-xl border border-white/[0.15] bg-[#0E121B] py-2.5 pl-9 pr-3 text-xs text-white placeholder-[#717B8F] focus:border-[#5B6CFF] focus:bg-[#121622] focus:ring-1 focus:ring-[#5B6CFF] focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/[0.06] bg-[#0E1117] p-3.5 text-xs text-[#8A94A6] space-y-1.5">
+            <div className="rounded-xl border border-white/[0.08] bg-[#10131C] p-3.5 text-xs text-[#8A94A6] space-y-1.5">
               <div className="flex items-center space-x-2 text-white font-medium">
                 <ShieldCheck className="h-4 w-4 text-[#5B6CFF]" />
                 <span>Multi-Account Key Isolation</span>
               </div>
               <p className="leading-relaxed text-[11px] text-[#8C98AC]">
-                Keys tagged under this Gmail account will be isolated. You can route API requests strictly through keys attached to this Gmail account using the header <code className="rounded bg-white/[0.06] px-1 py-0.5 text-[#5B6CFF]">x-gmail-tag: {emailInput || 'your-account@gmail.com'}</code>.
+                Keys tagged under this Gmail account will be isolated. You can route API requests strictly through keys attached to this Gmail account using the header <code className="rounded bg-white/[0.08] px-1 py-0.5 text-[#8C9BFF]">x-gmail-tag: {emailInput || 'your-account@gmail.com'}</code>.
               </p>
             </div>
           </form>
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end space-x-3 border-t border-white/[0.08] px-6 py-4 shrink-0 bg-[#161924] rounded-b-2xl">
+        <div className="flex items-center justify-end space-x-3 border-t border-white/[0.08] px-6 py-4 shrink-0 bg-[#191D2B] rounded-b-2xl">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-white/[0.08] bg-[#141822] px-4 py-2 text-xs font-medium text-[#8A94A6] hover:text-white transition"
+            className="rounded-xl border border-white/[0.1] bg-[#141822] px-4 py-2 text-xs font-medium text-[#8A94A6] hover:text-white transition"
           >
             Cancel
           </button>

@@ -1,6 +1,19 @@
 import crypto from 'crypto';
 import type { ApiKeyItem, GmailAccount, ProviderId, RouterSettings, RouterToken, UsageLog } from '../src/types';
 import { getDatabase } from './db';
+import {
+  initPostgresTables,
+  isDatabaseConfigured,
+  pgClearUsageLogs,
+  pgDeleteApiKey,
+  pgDeleteRouterToken,
+  pgInsertRouterToken,
+  pgInsertUsageLog,
+  pgLoadAllData,
+  pgUpsertApiKey,
+  pgUpsertGmailAccount,
+  pgUpsertSettings,
+} from './postgres';
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'router-panel-secure-aes-key-32ch'; // 32 bytes
 const IV_GCM_LENGTH = 12;
@@ -223,6 +236,77 @@ class PersistentRouterStore {
     }
   }
 
+  public async syncWithPostgres(): Promise<boolean> {
+    if (!isDatabaseConfigured()) return false;
+    try {
+      console.log('[Store] Initializing Supabase / PostgreSQL tables and syncing...');
+      await initPostgresTables();
+      const remote = await pgLoadAllData();
+      if (remote && remote.keys.length > 0) {
+        console.log(`[Store] Loaded ${remote.keys.length} keys from Supabase / PostgreSQL into local store.`);
+        const db = getDatabase();
+        for (const k of remote.keys) {
+          db.prepare(`
+            INSERT INTO api_keys (
+              id, user_id, provider, label, masked_key, encrypted_key, gmail_tag, status, priority,
+              total_requests, tokens_used, last_latency_ms, last_used_at, created_at, enabled,
+              custom_base_url, custom_auth_header, cooldown_until
+            ) VALUES (?, 'default-user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              label = excluded.label,
+              status = excluded.status,
+              priority = excluded.priority,
+              total_requests = excluded.total_requests,
+              tokens_used = excluded.tokens_used,
+              last_latency_ms = excluded.last_latency_ms,
+              last_used_at = excluded.last_used_at,
+              enabled = excluded.enabled,
+              cooldown_until = excluded.cooldown_until
+          `).run(
+            k.id,
+            k.provider,
+            k.label,
+            k.maskedKey,
+            k.encryptedKey,
+            k.gmailTag,
+            k.status,
+            k.priority,
+            k.totalRequests,
+            k.tokensUsed,
+            k.lastLatencyMs || 0,
+            k.lastUsedAt,
+            k.createdAt,
+            k.enabled ? 1 : 0,
+            k.customBaseUrl || null,
+            k.customAuthHeader || null,
+            typeof k.cooldownUntil === 'number' ? k.cooldownUntil : null
+          );
+        }
+
+        if (remote.settings) {
+          this.updateSettings(remote.settings);
+        }
+      } else {
+        // Supabase is empty: push initial local keys, accounts, settings to Supabase
+        console.log('[Store] Supabase is empty. Pushing initial keys and settings to Supabase...');
+        const keys = this.getKeys('all', 'default-user');
+        for (const k of keys) {
+          await pgUpsertApiKey(k, 'default-user');
+        }
+        const accounts = this.getGmailAccounts('default-user');
+        for (const a of accounts) {
+          await pgUpsertGmailAccount(a, 'default-user');
+        }
+        const settings = this.getSettings('default-user');
+        await pgUpsertSettings(settings, 'default-user');
+      }
+      return true;
+    } catch (err: any) {
+      console.warn('[Store] Supabase sync error:', err.message);
+      return false;
+    }
+  }
+
   // --- API Keys Methods ---
   public getKeys(gmail?: string, userId = 'default-user'): ApiKeyItem[] {
     const db = getDatabase();
@@ -316,7 +400,9 @@ class PersistentRouterStore {
       data.customAuthHeader || null
     );
 
-    return this.getKeyById(id)!;
+    const created = this.getKeyById(id)!;
+    pgUpsertApiKey(created, userId).catch(() => {});
+    return created;
   }
 
   public updateKey(id: string, updates: Partial<ApiKeyItem>): ApiKeyItem | null {
@@ -355,12 +441,15 @@ class PersistentRouterStore {
       id
     );
 
-    return this.getKeyById(id)!;
+    const updated = this.getKeyById(id)!;
+    pgUpsertApiKey(updated, 'default-user').catch(() => {});
+    return updated;
   }
 
   public deleteKey(id: string): boolean {
     const db = getDatabase();
     const res = db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
+    pgDeleteApiKey(id).catch(() => {});
     return Number(res.changes) > 0;
   }
 
@@ -491,16 +580,19 @@ class PersistentRouterStore {
       VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?)
     `).run(id, userId, label, tokenHash, tokenPrefix, JSON.stringify(allowedProviders), createdAt);
 
+    const createdTokenItem = {
+      id,
+      label,
+      tokenPrefix,
+      allowedProviders,
+      totalCalls: 0,
+      lastUsed: null,
+      createdAt,
+    };
+    pgInsertRouterToken(createdTokenItem, tokenHash, userId).catch(() => {});
+
     return {
-      token: {
-        id,
-        label,
-        tokenPrefix,
-        allowedProviders,
-        totalCalls: 0,
-        lastUsed: null,
-        createdAt,
-      },
+      token: createdTokenItem,
       rawToken,
     };
   }
@@ -508,6 +600,7 @@ class PersistentRouterStore {
   public revokeToken(id: string): boolean {
     const db = getDatabase();
     const res = db.prepare('DELETE FROM router_tokens WHERE id = ?').run(id);
+    pgDeleteRouterToken(id).catch(() => {});
     return Number(res.changes) > 0;
   }
 
@@ -582,7 +675,7 @@ class PersistentRouterStore {
       VALUES (?, ?, ?, ?, 0, ?, ?)
     `).run(id, userId, email, name || email.split('@')[0], avatarColor, addedAt);
 
-    return {
+    const account: GmailAccount = {
       id,
       email,
       name: name || email.split('@')[0],
@@ -591,6 +684,9 @@ class PersistentRouterStore {
       addedAt,
       keyCount: 0,
     };
+    pgUpsertGmailAccount(account, userId).catch(() => {});
+
+    return account;
   }
 
   // --- Usage Logs Methods ---
@@ -644,12 +740,16 @@ class PersistentRouterStore {
       log.promptPreview || null
     );
 
-    return { id, timestamp, ...log };
+    const createdLog = { id, timestamp, ...log };
+    pgInsertUsageLog(createdLog, userId).catch(() => {});
+
+    return createdLog;
   }
 
   public clearLogs(userId = 'default-user'): void {
     const db = getDatabase();
     db.prepare("DELETE FROM usage_logs WHERE user_id = ? OR user_id = 'default-user'").run(userId);
+    pgClearUsageLogs(userId).catch(() => {});
   }
 
   // --- Settings Methods ---
@@ -686,6 +786,8 @@ class PersistentRouterStore {
       merged.rateLimitTolerance,
       merged.logRetentionDays
     );
+
+    pgUpsertSettings(merged, userId).catch(() => {});
 
     return merged;
   }

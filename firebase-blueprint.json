@@ -1,0 +1,140 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with authentication and account identity details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 254 },
+        "name": { "type": "string", "maxLength": 128 },
+        "avatar": { "type": "string", "maxLength": 1024 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "name", "createdAt"]
+    },
+    "ApiKey": {
+      "title": "ApiKey",
+      "description": "Encrypted multi-provider API keys managed by the Nexus Router",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "provider": { "type": "string", "maxLength": 64 },
+        "label": { "type": "string", "maxLength": 128 },
+        "maskedKey": { "type": "string", "maxLength": 128 },
+        "encryptedKey": { "type": "string", "maxLength": 2048 },
+        "gmailTag": { "type": "string", "maxLength": 254 },
+        "status": { "type": "string", "enum": ["active", "rate-limited", "cooldown", "invalid", "expired", "error"] },
+        "priority": { "type": "integer" },
+        "totalRequests": { "type": "integer" },
+        "tokensUsed": { "type": "integer" },
+        "lastUsedAt": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "enabled": { "type": "boolean" },
+        "customBaseUrl": { "type": "string", "maxLength": 1024 },
+        "customAuthHeader": { "type": "string", "maxLength": 256 },
+        "cooldownUntil": { "type": "string" },
+        "lastLatencyMs": { "type": "integer" }
+      },
+      "required": ["id", "userId", "provider", "label", "maskedKey", "encryptedKey", "gmailTag", "status", "priority", "createdAt", "enabled"]
+    },
+    "GmailAccount": {
+      "title": "GmailAccount",
+      "description": "Tagged Gmail identities for multi-account key segmentation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 254 },
+        "name": { "type": "string", "maxLength": 128 },
+        "isPrimary": { "type": "boolean" },
+        "avatarColor": { "type": "string", "maxLength": 32 },
+        "keyCount": { "type": "integer" },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "email", "name", "isPrimary", "avatarColor", "addedAt"]
+    },
+    "RouterToken": {
+      "title": "RouterToken",
+      "description": "Client authentication ingress tokens for external agent integration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "label": { "type": "string", "maxLength": 128 },
+        "tokenPrefix": { "type": "string", "maxLength": 64 },
+        "tokenHash": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastUsed": { "type": "string" },
+        "totalCalls": { "type": "integer" },
+        "allowedProviders": { "type": "array" }
+      },
+      "required": ["id", "userId", "label", "tokenPrefix", "createdAt", "totalCalls"]
+    },
+    "UsageLog": {
+      "title": "UsageLog",
+      "description": "Audit and telemetry record of requests proxied through the router",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "provider": { "type": "string", "maxLength": 64 },
+        "keyId": { "type": "string", "maxLength": 128 },
+        "keyLabel": { "type": "string", "maxLength": 128 },
+        "gmailTag": { "type": "string", "maxLength": 254 },
+        "model": { "type": "string", "maxLength": 128 },
+        "tokensUsed": { "type": "integer" },
+        "status": { "type": "string", "enum": ["success", "fallback_recovered", "rate_limited", "error"] },
+        "latencyMs": { "type": "integer" },
+        "fallbackAttempted": { "type": "boolean" },
+        "endpoint": { "type": "string", "maxLength": 256 },
+        "promptPreview": { "type": "string", "maxLength": 256 }
+      },
+      "required": ["id", "userId", "timestamp", "provider", "keyId", "status", "latencyMs"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Gateway routing policies and failover configurations",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "rotationStrategy": { "type": "string", "enum": ["round-robin", "least-recently-used", "priority-weight"] },
+        "autoFallback": { "type": "boolean" },
+        "maxFallbackRetries": { "type": "integer" },
+        "cooldownSeconds": { "type": "integer" },
+        "rateLimitTolerance": { "type": "integer" },
+        "logRetentionDays": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "rotationStrategy", "autoFallback", "maxFallbackRetries", "cooldownSeconds", "rateLimitTolerance", "logRetentionDays"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile records containing account metadata."
+    },
+    "/api_keys/{keyId}": {
+      "schema": { "$ref": "#/entities/ApiKey" },
+      "description": "Encrypted API keys belonging to users."
+    },
+    "/gmail_accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/GmailAccount" },
+      "description": "Tagged Gmail account identities."
+    },
+    "/router_tokens/{tokenId}": {
+      "schema": { "$ref": "#/entities/RouterToken" },
+      "description": "Master router ingress bearer tokens."
+    },
+    "/usage_logs/{logId}": {
+      "schema": { "$ref": "#/entities/UsageLog" },
+      "description": "Real-time usage and routing audit logs."
+    },
+    "/settings/{userId}": {
+      "schema": { "$ref": "#/entities/Settings" },
+      "description": "Per-user gateway routing and failover settings."
+    }
+  }
+}

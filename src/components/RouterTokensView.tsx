@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Check,
   Code2,
@@ -283,9 +284,9 @@ console.log(data.choices[0].message.content);`;
       </div>
 
       {/* CREATE TOKEN MODAL */}
-      {isCreateOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-[2px]">
-          <div className="my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-white/[0.1] bg-[#161B26] p-6 shadow-2xl">
+      {isCreateOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="my-auto w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-white/[0.14] bg-[#161924] p-6 shadow-2xl shadow-black animate-in zoom-in-95 duration-150">
             <h3 className="font-semibold text-white">Generate Master Router Token</h3>
             <p className="text-xs text-[#8A94A6]">
               This token will have full routing access to all keys in your vault.
@@ -300,28 +301,29 @@ console.log(data.choices[0].message.content);`;
                   value={tokenLabel}
                   onChange={(e) => setTokenLabel(e.target.value)}
                   required
-                  className="mt-1 w-full rounded-xl border border-white/[0.08] bg-[#0E1116] px-3 py-2 text-xs text-white placeholder-[#6C768A] focus:border-[#5B6CFF] focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-white/[0.14] bg-[#0E121B] px-3 py-2 text-xs text-white placeholder-[#6C768A] focus:border-[#5B6CFF] focus:bg-[#121622] focus:outline-none"
                 />
               </div>
 
-              <div className="flex justify-end space-x-3 border-t border-white/[0.06] pt-4">
+              <div className="flex justify-end space-x-3 border-t border-white/[0.08] pt-4">
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(false)}
-                  className="rounded-xl border border-white/[0.08] bg-[#141822] px-4 py-2 text-xs font-medium text-[#8A94A6] hover:text-white"
+                  className="rounded-xl border border-white/[0.1] bg-[#141822] px-4 py-2 text-xs font-medium text-[#8A94A6] hover:text-white transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-[#5B6CFF] px-4 py-2 text-xs font-medium text-white hover:bg-[#4E5EEB]"
+                  className="rounded-xl bg-[#5B6CFF] px-4 py-2 text-xs font-medium text-white hover:bg-[#4E5EEB] transition"
                 >
                   Generate Token
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -104,3 +104,22 @@ export interface UserProfile {
   name: string;
   avatar?: string;
 }
+
+export interface DatabaseStatus {
+  configured: boolean;
+  provider: 'supabase' | 'postgres' | 'sqlite';
+  providerName: string;
+  connected: boolean;
+  host: string;
+  databaseName: string;
+  sslEnabled: boolean;
+  latencyMs: number | null;
+  tableStats: {
+    apiKeys: number;
+    gmailAccounts: number;
+    routerTokens: number;
+    usageLogs: number;
+  };
+  lastSyncTime: string;
+  error?: string | null;
+}

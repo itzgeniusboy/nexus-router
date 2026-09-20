@@ -97,7 +97,10 @@ export function configurePassport(app: Express) {
 
   const clientID = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const callbackURL = process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback';
+  const appUrl =
+    process.env.APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://nexusrouter.vercel.app');
+  const callbackURL = process.env.GOOGLE_CALLBACK_URL || `${appUrl}/auth/google/callback`;
 
   if (clientID && clientSecret) {
     passport.use(
@@ -106,6 +109,7 @@ export function configurePassport(app: Express) {
           clientID,
           clientSecret,
           callbackURL,
+          proxy: true,
         },
         async (accessToken, refreshToken, profile, done) => {
           try {

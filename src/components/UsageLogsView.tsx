@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -173,10 +174,10 @@ export const UsageLogsView: React.FC<Props> = ({ logs, onClearLogs }) => {
       </div>
 
       {/* Log Details Modal */}
-      {selectedLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-[2px]">
-          <div className="my-auto flex w-full max-w-lg max-h-[90vh] flex-col rounded-2xl border border-white/[0.1] bg-[#161B26] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/[0.06] p-5 pb-4 shrink-0">
+      {selectedLog && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="my-auto flex w-full max-w-lg max-h-[90vh] flex-col rounded-2xl border border-white/[0.14] bg-[#161924] shadow-2xl shadow-black animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-white/[0.08] p-5 pb-4 shrink-0 bg-[#191D2B] rounded-t-2xl">
               <div className="flex items-center space-x-2">
                 <ProviderIcon provider={selectedLog.provider} size={18} />
                 <h3 className="font-semibold text-white">Log Inspection: {selectedLog.id}</h3>
@@ -190,7 +191,7 @@ export const UsageLogsView: React.FC<Props> = ({ logs, onClearLogs }) => {
             </div>
 
             <div className="overflow-y-auto p-5 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 rounded-xl border border-white/[0.04] bg-[#0E1116] p-3">
+              <div className="grid grid-cols-2 gap-3 rounded-xl border border-white/[0.08] bg-[#0E121B] p-3">
                 <div>
                   <span className="text-[#6C768A]">Timestamp:</span>
                   <p className="font-mono text-white">{new Date(selectedLog.timestamp).toISOString()}</p>
@@ -226,22 +227,23 @@ export const UsageLogsView: React.FC<Props> = ({ logs, onClearLogs }) => {
               {/* Prompt Preview */}
               <div>
                 <span className="text-[#6C768A]">Prompt Preview:</span>
-                <p className="mt-1 rounded-xl border border-white/[0.06] bg-[#0E1116] p-3 text-[#A9B7D0]">
+                <p className="mt-1 rounded-xl border border-white/[0.08] bg-[#0E121B] p-3 text-[#A9B7D0]">
                   {selectedLog.promptPreview || 'No prompt content recorded.'}
                 </p>
               </div>
             </div>
 
-            <div className="flex justify-end border-t border-white/[0.06] bg-[#161B26] p-4 shrink-0 rounded-b-2xl">
+            <div className="flex justify-end border-t border-white/[0.08] bg-[#191D2B] p-4 shrink-0 rounded-b-2xl">
               <button
                 onClick={() => setSelectedLog(null)}
-                className="rounded-xl bg-[#5B6CFF] px-4 py-2 text-xs font-medium text-white hover:bg-[#4E5EEB]"
+                className="rounded-xl bg-[#5B6CFF] px-4 py-2 text-xs font-medium text-white hover:bg-[#4E5EEB] transition"
               >
                 Close
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
