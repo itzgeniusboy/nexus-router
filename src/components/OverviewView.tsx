@@ -68,7 +68,7 @@ export const OverviewView: React.FC<Props> = ({
           <div>
             <div className="flex items-center space-x-2 text-xs font-semibold uppercase tracking-wider text-[#5B6CFF]">
               <ShieldCheck className="h-4 w-4" />
-              <span>Universal AI Routing Gateway</span>
+              <span>Nexus Router Gateway</span>
             </div>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
               Zero-Downtime Multi-Provider Key Rotation

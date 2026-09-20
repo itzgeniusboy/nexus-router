@@ -317,7 +317,7 @@ export default function App() {
         {/* Minimal Footer */}
         <footer className="border-t border-white/[0.04] bg-[#0B0D10]/90 py-4 text-center text-xs text-[#6C768A]">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-            <span>Universal AI Router Gateway • Port 3000 Ingress</span>
+            <span>Nexus Router Gateway • Port 3000 Ingress</span>
             <span>AES-256-GCM Encrypted Vault • Rate-Limit Auto-Rotation Active</span>
           </div>
         </footer>

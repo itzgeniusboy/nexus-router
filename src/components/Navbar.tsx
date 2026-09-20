@@ -72,7 +72,7 @@ export const Navbar: React.FC<Props> = ({
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="font-semibold tracking-tight text-white">Universal AI Router</span>
+              <span className="font-semibold tracking-tight text-white">Nexus Router</span>
               <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-emerald-400">
                 ACTIVE
               </span>

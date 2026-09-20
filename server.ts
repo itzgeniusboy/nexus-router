@@ -70,7 +70,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    service: 'Universal AI API Key Router Gateway',
+    service: 'Nexus Router Gateway',
     version: '1.0.0',
     port: PORT,
   });
@@ -593,7 +593,7 @@ async function start() {
   // Refactor start() so when process.env.VERCEL is set, it exports the Express app instead of calling .listen()
   if (!process.env.VERCEL) {
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`[Universal AI Router] Server listening on http://0.0.0.0:${PORT}`);
+      console.log(`[Nexus Router] Server listening on http://0.0.0.0:${PORT}`);
     });
   }
 }

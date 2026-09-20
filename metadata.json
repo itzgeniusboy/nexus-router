@@ -1,5 +1,5 @@
 {
-  "name": "Universal AI API Key Router & Gateway Panel",
+  "name": "Nexus Router",
   "description": "Production-grade multi-provider AI API key vault, continuous auto-rotation & fallback router, OpenAI-compatible proxy, and usage analytics panel.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
