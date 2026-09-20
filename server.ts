@@ -593,6 +593,56 @@ app.post('/api/v1/chat/completions', routerRateLimiter, async (req, res) => {
   });
 });
 
+// Direct OpenAI-compatible alias endpoints (supports both /v1/... and /api/v1/...)
+app.post('/v1/chat/completions', routerRateLimiter, (req, res, next) => {
+  req.url = '/api/v1/chat/completions';
+  (app as any).handle(req, res, next);
+});
+
+// GET /v1/models & /api/v1/models for standard OpenAI SDK compatibility
+app.get(['/v1/models', '/api/v1/models'], (req, res) => {
+  const modelsList = [
+    { id: 'gpt-4o', object: 'model', created: 1715367049, owned_by: 'openai' },
+    { id: 'gpt-4o-mini', object: 'model', created: 1721295244, owned_by: 'openai' },
+    { id: 'claude-3-7-sonnet-latest', object: 'model', created: 1740000000, owned_by: 'anthropic' },
+    { id: 'claude-3-5-sonnet-latest', object: 'model', created: 1729600000, owned_by: 'anthropic' },
+    { id: 'gemini-flash-latest', object: 'model', created: 1734000000, owned_by: 'google' },
+    { id: 'deepseek-chat', object: 'model', created: 1730000000, owned_by: 'deepseek' },
+    { id: 'llama-3.3-70b-versatile', object: 'model', created: 1733000000, owned_by: 'groq' },
+    { id: 'mistral-large-latest', object: 'model', created: 1721000000, owned_by: 'mistral' },
+  ];
+  res.json({ object: 'list', data: modelsList });
+});
+
+// Explicit JSON 404 handler for API routes to guarantee clean JSON errors instead of HTML
+app.use(['/api/*', '/v1/*'], (req, res) => {
+  res.status(404).json({
+    error: {
+      message: `Cannot ${req.method} ${req.originalUrl || req.url}`,
+      type: 'not_found_error',
+      status: 404,
+    },
+  });
+});
+
+// Global Express error handler to guarantee all server errors return valid JSON (never HTML "A server error occurred...")
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || 'An unexpected internal server error occurred';
+  console.error(`[Server Error ${status}]:`, err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(status).json({
+    success: false,
+    error: {
+      message,
+      type: err.type || 'internal_server_error',
+      status,
+    },
+  });
+});
+
 // Start server and attach Vite middleware in development (only if not Vercel serverless)
 async function start() {
   if (process.env.NODE_ENV !== 'production') {

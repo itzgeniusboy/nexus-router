@@ -7,6 +7,7 @@ import { OverviewView } from './components/OverviewView';
 import { RouterTokensView } from './components/RouterTokensView';
 import { SettingsView } from './components/SettingsView';
 import { UsageLogsView } from './components/UsageLogsView';
+import { safeFetchJson } from './lib/safe-fetch';
 import {
   ApiKeyItem,
   DatabaseStatus,
@@ -40,28 +41,28 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAddKeyModalOpen, setIsAddKeyModalOpen] = useState(false);
 
-  // Fetch initial dashboard state & user session
+  // Fetch initial dashboard state & user session safely
   const fetchData = async () => {
     try {
       const [sessionRes, keysRes, tokensRes, logsRes, settingsRes, dbRes] = await Promise.all([
-        fetch('/api/auth/session').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/tokens').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/logs').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/settings').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/database/status').then((r) => r.json()).catch(() => ({})),
+        safeFetchJson<{ user?: UserProfile }>('/api/auth/session'),
+        safeFetchJson<{ keys?: ApiKeyItem[] }>('/api/keys'),
+        safeFetchJson<{ tokens?: RouterToken[] }>('/api/tokens'),
+        safeFetchJson<{ logs?: UsageLog[] }>('/api/logs'),
+        safeFetchJson<{ settings?: RouterSettings }>('/api/settings'),
+        safeFetchJson<{ status?: DatabaseStatus }>('/api/database/status'),
       ]);
 
-      if (sessionRes.user) {
-        setUser(sessionRes.user);
+      if (sessionRes.data?.user) {
+        setUser(sessionRes.data.user);
       } else {
         setUser(null);
       }
-      if (keysRes.keys) setKeys(keysRes.keys);
-      if (tokensRes.tokens) setTokens(tokensRes.tokens);
-      if (logsRes.logs) setLogs(logsRes.logs);
-      if (settingsRes.settings) setSettings(settingsRes.settings);
-      if (dbRes.status) setDbStatus(dbRes.status);
+      if (keysRes.data?.keys) setKeys(keysRes.data.keys);
+      if (tokensRes.data?.tokens) setTokens(tokensRes.data.tokens);
+      if (logsRes.data?.logs) setLogs(logsRes.data.logs);
+      if (settingsRes.data?.settings) setSettings(settingsRes.data.settings);
+      if (dbRes.data?.status) setDbStatus(dbRes.data.status);
     } catch (err) {
       console.error('Error fetching dashboard state:', err);
     } finally {
@@ -75,63 +76,65 @@ export default function App() {
 
   // Manual Authentication Handlers (Username & Password)
   const handleLogin = async (username: string, password: string) => {
-    const res = await fetch('/api/auth/login', {
+    const res = await safeFetchJson<{ success?: boolean; user?: UserProfile; error?: string }>('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || 'Failed to login');
+    if (!res.ok || !res.data?.success) {
+      throw new Error(res.data?.error || 'Failed to login');
     }
-    setUser(data.user);
+    if (res.data.user) {
+      setUser(res.data.user);
+    }
     // Reload user-scoped data
     const [keysRes, tokensRes, logsRes] = await Promise.all([
-      fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/tokens').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/logs').then((r) => r.json()).catch(() => ({})),
+      safeFetchJson<{ keys?: ApiKeyItem[] }>('/api/keys'),
+      safeFetchJson<{ tokens?: RouterToken[] }>('/api/tokens'),
+      safeFetchJson<{ logs?: UsageLog[] }>('/api/logs'),
     ]);
-    if (keysRes.keys) setKeys(keysRes.keys);
-    if (tokensRes.tokens) setTokens(tokensRes.tokens);
-    if (logsRes.logs) setLogs(logsRes.logs);
+    if (keysRes.data?.keys) setKeys(keysRes.data.keys);
+    if (tokensRes.data?.tokens) setTokens(tokensRes.data.tokens);
+    if (logsRes.data?.logs) setLogs(logsRes.data.logs);
   };
 
   const handleRegister = async (username: string, password: string, name?: string) => {
-    const res = await fetch('/api/auth/register', {
+    const res = await safeFetchJson<{ success?: boolean; user?: UserProfile; error?: string }>('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password, name }),
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || 'Failed to create account');
+    if (!res.ok || !res.data?.success) {
+      throw new Error(res.data?.error || 'Failed to create account');
     }
-    setUser(data.user);
+    if (res.data.user) {
+      setUser(res.data.user);
+    }
     // Reload user-scoped data
     const [keysRes, tokensRes, logsRes] = await Promise.all([
-      fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/tokens').then((r) => r.json()).catch(() => ({})),
-      fetch('/api/logs').then((r) => r.json()).catch(() => ({})),
+      safeFetchJson<{ keys?: ApiKeyItem[] }>('/api/keys'),
+      safeFetchJson<{ tokens?: RouterToken[] }>('/api/tokens'),
+      safeFetchJson<{ logs?: UsageLog[] }>('/api/logs'),
     ]);
-    if (keysRes.keys) setKeys(keysRes.keys);
-    if (tokensRes.tokens) setTokens(tokensRes.tokens);
-    if (logsRes.logs) setLogs(logsRes.logs);
+    if (keysRes.data?.keys) setKeys(keysRes.data.keys);
+    if (tokensRes.data?.tokens) setTokens(tokensRes.data.tokens);
+    if (logsRes.data?.logs) setLogs(logsRes.data.logs);
   };
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await safeFetchJson('/api/auth/logout', { method: 'POST' });
     } finally {
       setUser(null);
       // Reload default keys
       const [keysRes, tokensRes, logsRes] = await Promise.all([
-        fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/tokens').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/logs').then((r) => r.json()).catch(() => ({})),
+        safeFetchJson<{ keys?: ApiKeyItem[] }>('/api/keys'),
+        safeFetchJson<{ tokens?: RouterToken[] }>('/api/tokens'),
+        safeFetchJson<{ logs?: UsageLog[] }>('/api/logs'),
       ]);
-      if (keysRes.keys) setKeys(keysRes.keys);
-      if (tokensRes.tokens) setTokens(tokensRes.tokens);
-      if (logsRes.logs) setLogs(logsRes.logs);
+      if (keysRes.data?.keys) setKeys(keysRes.data.keys);
+      if (tokensRes.data?.tokens) setTokens(tokensRes.data.tokens);
+      if (logsRes.data?.logs) setLogs(logsRes.data.logs);
     }
   };
 
@@ -139,10 +142,9 @@ export default function App() {
   const handleTestDatabase = async () => {
     setIsDbTesting(true);
     try {
-      const res = await fetch('/api/database/test', { method: 'POST' });
-      const data = await res.json();
-      if (data.status) {
-        setDbStatus(data.status);
+      const res = await safeFetchJson<{ status?: DatabaseStatus }>('/api/database/test', { method: 'POST' });
+      if (res.data?.status) {
+        setDbStatus(res.data.status);
       }
     } catch (err) {
       console.error('Error testing database:', err);
@@ -154,17 +156,16 @@ export default function App() {
   const handleSyncDatabase = async () => {
     setIsDbSyncing(true);
     try {
-      const res = await fetch('/api/database/sync', { method: 'POST' });
-      const data = await res.json();
-      if (data.status) {
-        setDbStatus(data.status);
+      const res = await safeFetchJson<{ status?: DatabaseStatus }>('/api/database/sync', { method: 'POST' });
+      if (res.data?.status) {
+        setDbStatus(res.data.status);
       }
       const [keysRes, settingsRes] = await Promise.all([
-        fetch('/api/keys').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/settings').then((r) => r.json()).catch(() => ({})),
+        safeFetchJson<{ keys?: ApiKeyItem[] }>('/api/keys'),
+        safeFetchJson<{ settings?: RouterSettings }>('/api/settings'),
       ]);
-      if (keysRes.keys) setKeys(keysRes.keys);
-      if (settingsRes.settings) setSettings(settingsRes.settings);
+      if (keysRes.data?.keys) setKeys(keysRes.data.keys);
+      if (settingsRes.data?.settings) setSettings(settingsRes.data.settings);
     } catch (err) {
       console.error('Error syncing database:', err);
     } finally {
@@ -182,113 +183,106 @@ export default function App() {
     customBaseUrl?: string;
     customAuthHeader?: string;
   }) => {
-    const res = await fetch('/api/keys', {
+    const res = await safeFetchJson<{ success?: boolean; key?: ApiKeyItem }>('/api/keys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     });
-    const data = await res.json();
-    if (data.success && data.key) {
-      setKeys((prev) => [data.key, ...prev]);
+    if (res.data?.success && res.data.key) {
+      setKeys((prev) => [res.data.key!, ...prev]);
     }
   };
 
   const handleToggleKey = async (id: string, enabled: boolean) => {
-    const res = await fetch(`/api/keys/${id}`, {
+    const res = await safeFetchJson<{ success?: boolean; key?: ApiKeyItem }>(`/api/keys/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled }),
     });
-    const data = await res.json();
-    if (data.success && data.key) {
-      setKeys((prev) => prev.map((k) => (k.id === id ? data.key : k)));
+    if (res.data?.success && res.data.key) {
+      setKeys((prev) => prev.map((k) => (k.id === id ? res.data.key! : k)));
     }
   };
 
   const handleDeleteKey = async (id: string) => {
-    const res = await fetch(`/api/keys/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
+    const res = await safeFetchJson<{ success?: boolean }>(`/api/keys/${id}`, { method: 'DELETE' });
+    if (res.data?.success) {
       setKeys((prev) => prev.filter((k) => k.id !== id));
     }
   };
 
-  const handleTestKey = async (id: string) => {
-    const res = await fetch(`/api/keys/${id}/test`, { method: 'POST' });
-    const data = await res.json();
-    if (data.success) {
+  const handleTestKey = async (id: string): Promise<{ latencyMs: number }> => {
+    const res = await safeFetchJson<{ success?: boolean; latencyMs?: number; error?: string }>(`/api/keys/${id}/test`, { method: 'POST' });
+    const latency = res.data?.latencyMs || 0;
+    if (res.data?.success) {
       setKeys((prev) =>
-        prev.map((k) => (k.id === id ? { ...k, status: 'active', lastLatencyMs: data.latencyMs } : k))
+        prev.map((k) => (k.id === id ? { ...k, status: 'active', lastLatencyMs: latency } : k))
       );
     }
-    return data;
+    return { latencyMs: latency };
   };
 
   const handleUpdateKey = async (id: string, updates: Partial<ApiKeyItem>) => {
-    const res = await fetch(`/api/keys/${id}`, {
+    const res = await safeFetchJson<{ success?: boolean; key?: ApiKeyItem }>(`/api/keys/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });
-    const data = await res.json();
-    if (data.success && data.key) {
-      setKeys((prev) => prev.map((k) => (k.id === id ? data.key : k)));
+    if (res.data?.success && res.data.key) {
+      setKeys((prev) => prev.map((k) => (k.id === id ? res.data.key! : k)));
     }
   };
 
   // Handlers for Tokens
-  const handleCreateToken = async (label: string, allowedProviders: string[]) => {
-    const res = await fetch('/api/tokens', {
+  const handleCreateToken = async (label: string, allowedProviders: string[]): Promise<{ rawToken: string }> => {
+    const res = await safeFetchJson<{ success?: boolean; token?: RouterToken; rawToken?: string }>('/api/tokens', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label, allowedProviders }),
     });
-    const data = await res.json();
-    if (data.success && data.token) {
-      setTokens((prev) => [data.token, ...prev]);
+    if (res.data?.success && res.data.token) {
+      setTokens((prev) => [res.data.token!, ...prev]);
     }
-    return data;
+    return { rawToken: res.data?.rawToken || '' };
   };
 
   const handleRevokeToken = async (id: string) => {
-    const res = await fetch(`/api/tokens/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
+    const res = await safeFetchJson<{ success?: boolean }>(`/api/tokens/${id}`, { method: 'DELETE' });
+    if (res.data?.success) {
       setTokens((prev) => prev.filter((t) => t.id !== id));
     }
   };
 
   // Handlers for Logs
   const handleClearLogs = async () => {
-    const res = await fetch('/api/logs', { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
+    const res = await safeFetchJson<{ success?: boolean }>('/api/logs', { method: 'DELETE' });
+    if (res.data?.success) {
       setLogs([]);
     }
   };
 
   const handleRefreshLogs = async () => {
-    const res = await fetch('/api/logs');
-    const data = await res.json();
-    if (data.logs) {
-      setLogs(data.logs);
+    const [logsRes, keysRes] = await Promise.all([
+      safeFetchJson<{ logs?: UsageLog[] }>('/api/logs'),
+      safeFetchJson<{ keys?: ApiKeyItem[] }>('/api/keys'),
+    ]);
+    if (logsRes.data?.logs) {
+      setLogs(logsRes.data.logs);
     }
-    // also refresh key usage metrics
-    const keysRes = await fetch('/api/keys');
-    const keysData = await keysRes.json();
-    if (keysData.keys) setKeys(keysData.keys);
+    if (keysRes.data?.keys) {
+      setKeys(keysRes.data.keys);
+    }
   };
 
   // Handlers for Settings
   const handleUpdateSettings = async (newSettings: Partial<RouterSettings>) => {
-    const res = await fetch('/api/settings', {
+    const res = await safeFetchJson<{ success?: boolean; settings?: RouterSettings }>('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newSettings),
     });
-    const data = await res.json();
-    if (data.success && data.settings) {
-      setSettings(data.settings);
+    if (res.data?.success && res.data.settings) {
+      setSettings(res.data.settings);
     }
   };
 

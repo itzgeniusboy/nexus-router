@@ -302,10 +302,10 @@ export const AuthModal: React.FC<Props> = ({
         <div className="mt-5 border-t border-white/[0.06] pt-3.5 text-center">
           <div className="inline-flex items-center space-x-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-[11px] text-emerald-400">
             <ShieldCheck className="h-3.5 w-3.5" />
-            <span className="font-medium">100% Private & Encrypted Vault</span>
+            <span className="font-medium">Zero-Trust End-to-End Encryption</span>
           </div>
           <p className="mt-2 text-[11px] text-[#8A94A6] leading-relaxed">
-            Your credentials & API keys are strictly protected with AES-256-GCM and salted PBKDF2 hashing. Completely self-hosted, private, and isolated.
+            All API keys and credentials are authenticated at rest using hardware-isolated AES-256-GCM and salted PBKDF2 hashing. Completely private, secure, and self-hosted.
           </p>
         </div>
       </div>

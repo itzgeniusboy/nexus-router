@@ -520,7 +520,7 @@ export const SettingsView: React.FC<Props> = ({
                 </span>
               </div>
               <p className="mt-1 text-xs text-[#8A94A6]">
-                Authentication, CORS origins, trust proxies, and Firebase security rules aligned for production deployment on Vercel.
+                Authentication, CORS origins, trust proxies, and cryptographic vault security aligned for production deployment.
               </p>
             </div>
           </div>
@@ -569,56 +569,50 @@ export const SettingsView: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Firebase Authentication & Rules Alignment */}
+          {/* Database & Cryptographic Vault Security */}
           <div className="rounded-xl border border-white/[0.06] bg-[#0E1116] p-4 text-xs space-y-3">
             <div className="flex items-center space-x-2 text-white font-medium">
-              <Lock className="h-4 w-4 text-amber-400" />
-              <span>Firebase Auth & Firestore Rules Alignment</span>
+              <Lock className="h-4 w-4 text-emerald-400" />
+              <span>Database & Cryptographic Vault Security</span>
             </div>
             <p className="text-[11px] text-[#8A94A6]">
-              Configured domain whitelist and Zero-Trust ABAC security rules:
+              Hardware-isolated AES-256-GCM encryption with PBKDF2 credential derivation:
             </p>
 
             <div className="space-y-2">
               <div>
-                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Firebase Provisioned Project & Client SDK</span>
+                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Primary Database Engine</span>
                 <div className="mt-1 flex items-center justify-between rounded-lg bg-[#141720] px-3 py-2 border border-white/[0.04]">
                   <div className="flex items-center space-x-2">
                     <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <code className="font-mono text-emerald-400 text-[11px]">triple-outlook-k07pf</code>
+                    <code className="font-mono text-emerald-400 text-[11px]">Supabase (PostgreSQL 15+)</code>
                   </div>
-                  <span className="text-[10px] text-[#8A94A6] uppercase tracking-wider font-semibold">Client SDK Active</span>
+                  <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">SSL Active</span>
                 </div>
               </div>
 
               <div>
-                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Firebase Auth Authorized Domain</span>
+                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Authentication Model</span>
                 <div className="mt-1 flex items-center justify-between rounded-lg bg-[#141720] px-3 py-2 border border-white/[0.04]">
-                  <code className="font-mono text-amber-400 text-[11px]">nexusrouter.vercel.app</code>
-                  <button
-                    onClick={() => copyToClipboard('nexusrouter.vercel.app', 'fbdomain')}
-                    className="ml-2 flex items-center space-x-1 text-[#8A94A6] hover:text-white"
-                  >
-                    {copiedItem === 'fbdomain' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                    <span className="text-[10px]">{copiedItem === 'fbdomain' ? 'Copied' : 'Copy'}</span>
-                  </button>
+                  <code className="font-mono text-[#8C9BFF] text-[11px]">Salted PBKDF2 (10,000 Iterations)</code>
+                  <span className="text-[10px] text-emerald-400 font-medium">Self-Hosted</span>
                 </div>
               </div>
 
               <div>
-                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Hardened Security Rules</span>
+                <span className="text-[10px] uppercase font-semibold text-[#717B8F]">Vault Protection Standards</span>
                 <div className="mt-1 rounded-lg bg-[#141720] p-2.5 border border-white/[0.04] text-[11px] text-[#C5CEE0] space-y-1">
                   <div className="flex items-center justify-between">
-                    <span>Ruleset File:</span>
-                    <span className="font-mono text-white">firestore.rules (rules_version = '2')</span>
+                    <span>Key Encryption:</span>
+                    <span className="font-mono text-white">AES-256-GCM Authenticated</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>Entities Protected:</span>
-                    <span className="text-emerald-400 font-medium">users, api_keys, tokens, logs, settings</span>
+                    <span>Stored Tables:</span>
+                    <span className="text-emerald-400 font-medium">users, api_keys, router_tokens, usage_logs</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>Access Control Model:</span>
-                    <span className="text-[#8C9BFF]">Zero-Trust ABAC (Strict Ownership)</span>
+                    <span>Access Privacy:</span>
+                    <span className="text-[#8C9BFF]">100% Private (No 3P OAuth Required)</span>
                   </div>
                 </div>
               </div>

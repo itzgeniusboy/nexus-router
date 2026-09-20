@@ -15,6 +15,7 @@ import {
 import { PROVIDERS } from '../data/providers';
 import { ApiKeyItem, ProviderId } from '../types';
 import { ProviderIcon } from './ProviderIcon';
+import { safeFetchJson } from '../lib/safe-fetch';
 
 interface Props {
   keys: ApiKeyItem[];
@@ -46,7 +47,7 @@ export const ContinuousFlowTester: React.FC<Props> = ({ keys, onRefreshLogs, sel
       await new Promise((r) => setTimeout(r, 250));
       setStepState(3);
 
-      const res = await fetch('/api/v1/route', {
+      const res = await safeFetchJson('/api/v1/route', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -61,7 +62,7 @@ export const ContinuousFlowTester: React.FC<Props> = ({ keys, onRefreshLogs, sel
         }),
       });
 
-      const data = await res.json();
+      const data = res.data;
       setExecutionResult(data);
       setStepState(4);
       onRefreshLogs();
